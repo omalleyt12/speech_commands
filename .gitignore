@@ -1,0 +1,7 @@
+*.pyc
+*.7z
+logs/*
+train/*
+test/*
+*.csv
+
