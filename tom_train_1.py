@@ -14,8 +14,8 @@ sess = tf.InteractiveSession()
 
 batch_size = 100
 eval_step = 500
-training_step_list = [15000,5000,5000,3000]
-learning_rate_list = [0.001,0.0005,0.00025,0.0001]
+training_step_list = [1,1]
+learning_rate_list = [0.001,0.0001]
 data_dir = "train/audio"
 summary_dir = "logs" # where to save summary logs for Tensorboard
 wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","off","stop","go"]
@@ -31,8 +31,8 @@ window_stride_ms = 10.0
 window_size_samples = int(sample_rate * window_size_ms / 1000)
 window_stride_samples = int(sample_rate * window_stride_ms / 1000)
 dct_coefficient_count = 40 # bins to use for MFCC fingerprint
-percent_test = 0 # test set
-percent_val = 0 # val set
+percent_test = 10 # test set
+percent_val = 10 # val set
 
 def which_set(wav_path):
     # split into train, test, val sets deterministically
@@ -185,6 +185,8 @@ def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,
     bg_vol_list = []
     bg_list = []
     wav_list = []
+    train_indices_list = []
+    val_indices_list = []
     for j in range(batch_size):
         if mode == "train":
             samp_index = np.random.randint(len(data_index))
@@ -234,6 +236,8 @@ def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,
 
         if return_labels:
             labels.append(samp_data["label_array"])
+            train_indices_list.append(tom_index[samp_data["train_label"]])
+            val_indices_list.append(tom_index[samp_data["val_label"]])
 
     feed_dict={
         wav_ph: np.stack(wav_list),
@@ -243,26 +247,26 @@ def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,
         bg_ph: np.stack(bg_list),
         bg_volume_ph: np.stack(bg_vol_list)
     }
-    data = sess.run(mfcc,feed_dict=feed_dict)
-    if not return_labels:
-        return data
-    else:
-        labels = np.stack(labels,axis=0)
-        return data, labels
+    # data = sess.run(mfcc,feed_dict=feed_dict)
+    if return_labels:
+        feed_dict.update({
+            labels_ph: np.stack(labels),
+            train_indices_ph: np.stack(train_indices_list),
+            val_indices_ph: np.stack(val_indices_list)
+        })
+    return feed_dict
+
 
 data_index, tom_words, tom_index = load_train_data()
 bg_data = prepare_background_data()
 
-mfcc_height = mfcc.shape[1]
-mfcc_width = mfcc.shape[2]
-fingerprint_ph = tf.placeholder(tf.float32,[None,mfcc_height,mfcc_width],name="fingerprint_ph")
-labels_ph = tf.placeholder(tf.float32,[len(tom_words)],name="labels_ph")
-train_indices_ph = tf.placeholder(tf.int32,[None]) # used for train accuracy
-val_indices_ph = tf.placeholder(tf.int32,[None]) # used for val accuracy
+labels_ph = tf.placeholder(tf.float32,[None,len(tom_words)],name="labels_ph")
+train_indices_ph = tf.placeholder(tf.int64,[None]) # used for train accuracy
+val_indices_ph = tf.placeholder(tf.int64,[None]) # used for val accuracy
 
 keep_prob = tf.placeholder(tf.float32,name="keep_prob") # will be 0.5 for training, 1 for test
 
-fingerprint_4d = tf.reshape(fingerprint_ph,[-1,mfcc_height,mfcc_width,1])
+fingerprint_4d = tf.reshape(mfcc,[-1,mfcc.shape[1],mfcc.shape[2],1])
 
 conv_1_channels = 64
 conv_2_channels = 64
@@ -334,16 +338,15 @@ sum_steps = sum(training_step_list)
 for steps, learning_rate in zip(training_step_list,learning_rate_list):
     for i in range(steps): 
         current_step += 1
-        data, labels, train_indices, val_indices = get_mfcc_and_labels(data_index["train"],batch_size,sess,word2index)
+        feed_dict = get_mfcc_and_labels(data_index["train"],batch_size,sess,tom_words,tom_index)
+        feed_dict.update({
+            learning_rate_ph: learning_rate,
+            keep_prob: 0.5
+        })
         # now here's where we run the real, convnet part
         train_summary, train_accuracy, cross_ent_val, _, _ = sess.run(
-            [merged_summaries,accuracy,cross_entropy_mean,train_step,increment_global_step],
-            feed_dict={fingerprint_ph: data,
-                       labels_ph: labels,
-                       val_indices_ph: val_indices,
-                       train_indices_ph: train_indices,
-                       learning_rate_ph: learning_rate,
-                       keep_prob: 0.5}
+            [merged_summaries,train_accuracy,cross_entropy_mean,train_step,increment_global_step],
+            feed_dict=feed_dict
         )
         train_writer.add_summary(train_summary,current_step)
         tf.logging.info("Step {} Rate {} Accuracy {} Cross Entropy {}".format(current_step,learning_rate,train_accuracy,cross_ent_val))
@@ -352,13 +355,10 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             set_name = "val" if not current_step == sum_steps else "test"
             # run validation loop
             val_size = len(data_index[set_name])
-            val_data, val_labels, train_indices, val_indices = get_mfcc_and_labels(data_index[set_name],val_size,sess,word2index,mode="val")
-            val_summary, val_accuracy, val_cem = sess.run([merged_summaries,accuracy,cross_entropy_mean],
-                feed_dict={fingerprint_ph: val_data,
-                            val_indices_ph: val_indices,
-                            train_indices_ph: train_indices,
-                           labels_ph: val_labels,
-                           keep_prob: 1.0}
+            feed_dict = get_mfcc_and_labels(data_index[set_name],val_size,sess,tom_words,tom_index,mode="val")
+            feed_dict.update({keep_prob:1.0})
+            val_summary, val_accuracy, val_cem = sess.run([merged_summaries,val_accuracy,cross_entropy_mean],
+                                                          feed_dict=feed_dict
             )
             val_writer.add_summary(val_summary,current_step)
             tf.logging.info("{} Accuracy {} Loss {}".format(set_name,val_accuracy,val_cem))
@@ -369,16 +369,21 @@ df = pd.DataFrame([],columns=["fname","label"])
 
 test_dir = "test/audio"
 test_index = []
-for wav_path in gfile.Glob(test_dir + "/*.wav"):
-    file_name = os.path.basename(wav_path) 
-    test_index.append({"file":wav_path,"identifier":file_name})
+with tf.Session(graph=tf.Graph()) as sess:
+    wav_filename_ph = tf.placeholder(tf.string,[])
+    wav_loader = io_ops.read_file(wav_filename_ph)
+    wav_decoder = contrib_audio.decode_wav(wav_loader,desired_channels=1)
+    for wav_path in gfile.Glob(test_dir + "/*.wav"):
+        file_name = os.path.basename(wav_path) 
+        tdata = sess.run(wav_decoder,feed_dict={wav_filename_ph:wav_path}).audio.flatten()
+        test_index.append({"file":wav_path,"identifier":file_name,"data":tdata})
 offset = 0
 test_batch_size = 1000
 while offset < len(test_index):
-    test_data = get_mfcc_and_labels(test_index,test_batch_size,sess,word2index,offset=offset,mode="test",return_labels=False)
-
-    test_pred = sess.run(val_predicted_indices,feed_dict= {fingerprint_ph: test_data,keep_prob:0.5})
-    test_labels = [wanted_words[tind] for tind in test_pred]
+    feed_dict = get_mfcc_and_labels(test_index,test_batch_size,sess,word2index,offset=offset,mode="test",return_labels=False)
+    feed_dict.update({keep_prob:1.0})
+    test_pred = sess.run(val_predicted_indices,feed_dict=feed_dict)
+    test_labels = [tom_words[tind] for tind in test_pred]
 
     test_files = [t["identifier"] for t in test_index[offset:(offset + test_batch_size)] ]
 
