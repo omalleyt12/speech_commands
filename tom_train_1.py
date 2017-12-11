@@ -13,7 +13,7 @@ from tensorflow.python.util import compat
 
 batch_size = 100
 eval_step = 500
-training_step_list = [1,1]
+training_step_list = [15000,3000]
 learning_rate_list = [0.001,0.0001]
 data_dir = "train/audio"
 summary_dir = "logs" # where to save summary logs for Tensorboard
@@ -33,7 +33,7 @@ dct_coefficient_count = 40 # bins to use for MFCC fingerprint
 percent_test = 10 # test set
 percent_val = 10 # val set
 
-if True:
+if False:
     test_dir = "test/audio"
     test_index = []
     counter = 0
@@ -229,7 +229,7 @@ def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,
         ts_off_list.append(np.array(time_shift_offset))
 
         # add in background for training, or for test/val that are silence
-        if mode == "train" or (return_labels and samp_data["label"] == "silence"):
+        if mode == "train" or (return_labels and samp_data["train_label"] == "silence"):
             bg_index = np.random.randint(len(bg_data))
             bg_samp = bg_data[bg_index]
             bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
@@ -245,7 +245,7 @@ def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,
         bg_list.append(bg_sliced)
         bg_vol_list.append(bg_volume)
 
-        if "label" in samp_data and samp_data["label"] == "silence":
+        if "train_label" in samp_data and samp_data["train_label"] == "silence":
             volume = 0 # zero out the foreground for the silence labels
         else:
             volume = 1
@@ -321,12 +321,17 @@ learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 train_step = tf.train.GradientDescentOptimizer(learning_rate_ph).minimize(cross_entropy_mean)
 
 unknown_val = final_layer[:,1] # bc unknown is the second label for all unknown words
-train_predicted_indices = tf.argmax(final_layer,axis=1,output_type=tf.int32)
 
-def map_train_indices(train_ind):
-    return tf.cond(train_ind > len(wanted_words),lambda: 1,lambda: train_ind)
+# otherwise, unknown is basically always predicted
+def map_layer_to_train_pred(x):
+    return tf.cond(tf.equal(tf.argmax(x),1),lambda: tf.nn.top_k(x,2)[1][1], lambda: tf.argmax(x,output_type=tf.int32) )
+train_predicted_indices = tf.map_fn(map_layer_to_train_pred,final_layer,parallel_iterations=100,dtype=tf.int32)
+
+
+def map_layer_to_val_pred(x):
+    return tf.cond(tf.greater_equal(tf.argmax(x),len(wanted_words)),lambda: 1, lambda: tf.argmax(x,output_type=tf.int32) )
 # val_predicted_indices = tf.where(train_predicted_indices >= len(wanted_words),1,train_predicted_indices)
-val_predicted_indices = tf.map_fn(map_train_indices,train_predicted_indices)
+val_predicted_indices = tf.map_fn(map_layer_to_val_pred,final_layer,parallel_iterations=100)
 
 train_correct_prediction = tf.equal(train_predicted_indices,train_indices_ph)
 val_correct_prediction = tf.equal(val_predicted_indices,val_indices_ph)
@@ -364,7 +369,6 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             learning_rate_ph: learning_rate,
             keep_prob: 0.5
         })
-        print([type(k) for k in feed_dict.keys()])
         # now here's where we run the real, convnet part
         train_summary, t_accuracy, cross_ent_val, _, _ = sess.run(
             [merged_summaries,train_accuracy,cross_entropy_mean,train_step,increment_global_step],
@@ -373,11 +377,11 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
         train_writer.add_summary(train_summary,current_step)
         tf.logging.info("Step {} Rate {} Accuracy {} Cross Entropy {}".format(current_step,learning_rate,t_accuracy,cross_ent_val))
 
-        if False: #current_step % eval_step == 0 or current_step == sum_steps:
+        if current_step % eval_step == 0 or current_step == sum_steps:
             set_name = "val" if not current_step == sum_steps else "test"
             # run validation loop
             val_size = len(data_index[set_name])
-            feed_dict = get_mfcc_and_labels(data_index[set_name],val_size,sess,tom_words,tom_index,mode="val")
+            feed_dict = get_mfcc_and_labels(data_index[set_name],1000,sess,tom_words,tom_index,mode="val")
             feed_dict.update({keep_prob:1.0})
             val_summary, v_accuracy, val_cem = sess.run([merged_summaries,val_accuracy,cross_entropy_mean],
                                                           feed_dict=feed_dict
@@ -385,25 +389,26 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             val_writer.add_summary(val_summary,current_step)
             tf.logging.info("{} Accuracy {} Loss {}".format(set_name,v_accuracy,val_cem))
 
-# now here's where we run the test classification
-import pandas as pd
-df = pd.DataFrame([],columns=["fname","label"])
+if False:
+    # now here's where we run the test classification
+    import pandas as pd
+    df = pd.DataFrame([],columns=["fname","label"])
 
-offset = 0
-test_batch_size = 1000
-while offset < len(test_index):
-    feed_dict = get_mfcc_and_labels(test_index,test_batch_size,sess,tom_words,tom_index,offset=offset,mode="test",return_labels=False)
-    feed_dict.update({keep_prob:1.0})
-    test_pred = sess.run(val_predicted_indices,feed_dict=feed_dict)
-    test_labels = [tom_words[tind] for tind in test_pred]
+    offset = 0
+    test_batch_size = 1000
+    while offset < len(test_index):
+        feed_dict = get_mfcc_and_labels(test_index,test_batch_size,sess,tom_words,tom_index,offset=offset,mode="test",return_labels=False)
+        feed_dict.update({keep_prob:1.0})
+        test_pred = sess.run(val_predicted_indices,feed_dict=feed_dict)
+        test_labels = [tom_words[tind] for tind in test_pred]
 
-    test_files = [t["identifier"] for t in test_index[offset:(offset + test_batch_size)] ]
+        test_files = [t["identifier"] for t in test_index[offset:(offset + test_batch_size)] ]
 
-    test_batch_df = pd.DataFrame([{"fname":ti,"label":tl} for ti,tl in zip(test_files,test_labels)])
-    offset += test_batch_size
- 
-    print(offset)
-    df = pd.concat([df,test_batch_df])
+        test_batch_df = pd.DataFrame([{"fname":ti,"label":tl} for ti,tl in zip(test_files,test_labels)])
+        offset += test_batch_size
 
-df.to_csv("my_guesses_2.csv",index=False)
+        print(offset)
+        df = pd.concat([df,test_batch_df])
+
+    df.to_csv("my_guesses_3.csv",index=False)
 
