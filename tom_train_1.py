@@ -73,9 +73,10 @@ def load_train_data():
     other_words = list(set(all_words.keys()).difference(set(wanted_words)))
     total_word_list = wanted_words + other_words
     tomIndex = {w:i for i,w in enumerate(total_word_list)} # this will be used for new labeling criteriay
+    
     for k in data_index.keys():
         for i,rec in enumerate(data_index[k]):
-            word = data_index[k][i]["label"]
+            word = data_index[k][i]["train_label"]
             label_array = np.zeros(len(total_word_list))
             label_array[tomIndex[word]] = 1
             if word not in wanted_words:
@@ -91,17 +92,27 @@ def load_train_data():
         set_size = len(data_index[set_name])
         silence_size = int(math.ceil(set_size * silence_percentage) / 100)
         for _ in range(silence_size):
-            data_index[set_name].append({"label":"silence","file":silence_wav_path})
+            label_array = np.zeros(len(total_word_list))
+            label_array[0] = 1
+            data_index[set_name].append({"label_array":label_array,"train_label":"silence","val_label":"silence","file":silence_wav_path})
 
         # # add unknown words to val, train, test
         # random.shuffle(unknown_index[set_name])
         # unknown_size = int(math.ceil(set_size * unknown_percentage) / 100)
         # data_index[set_name].extend(unknown_index[set_name][:unknown_size])
 
-    # randomize each set
-    for set_name in ['val','test','train']:
-        random.shuffle(data_index[set_name])
-
+    # randomize each set and load data in-mem
+    with tf.Session(graph=tf.Graph()) as sess:
+        wav_filename_ph = tf.placeholder(tf.string,[])
+        wav_loader = io_ops.read_file(wav_filename_ph)
+        wav_decoder = contrib_audio.decode_wav(wav_loader,desired_channels=1)
+        
+        for set_name in ['val','test','train']:
+            random.shuffle(data_index[set_name])
+            for i, rec in enumerate(data_index[set_name]):
+                if i % 1000 == 0:
+                    print("{} {}".format(set_name,i))
+                data_index[set_name][i]["data"] = sess.run(wav_decoder,feed_dict={wav_filename_ph:wav_path}).audio.flatten()
     # get word2index mapping
     word2index = {}
     for word in all_words:
@@ -125,46 +136,55 @@ def prepare_background_data():
             bg_data.append(wav_data)
     return bg_data
 
+wav_ph = tf.placeholder(tf.float32,[None,sample_rate])
+volume_ph = tf.placeholder(tf.float32,[None])
+time_shift_padding_ph = tf.placeholder(tf.int32,[None,2,2])
+time_shift_offset_ph = tf.placeholder(tf.int32,[None,2])
+bg_ph = tf.placeholder(tf.float32,[None,sample_rate,1])
+bg_volume_ph = tf.placeholder(tf.float32,[None])
 
-# Preprocessing Graph parts
-wav_filename_ph = tf.placeholder(tf.string,[])
-wav_loader = io_ops.read_file(wav_filename_ph)
-wav_decoder = contrib_audio.decode_wav(wav_loader,desired_channels=1,desired_samples=sample_rate) # length of 1 sec
+# this will handle all distortion in parallel, and let me run the graph all together
+def distort_wav(ph_tup):
+    wav_ph, volume_ph, time_shift_padding_ph, time_shift_offset_ph, bg_ph, bg_volume_ph = ph_tup
+    wav = tf.reshape(wav_ph,[sample_rate,1])
+    scaled_wav = tf.multiply(wav, volume_ph)
+    padded_wav = tf.pad(scaled_wav,time_shift_padding_ph,mode="CONSTANT")
+    sliced_wav = tf.slice(padded_wav,time_shift_offset_ph,[sample_rate,-1])
+    scaled_bg = tf.multiply(bg_ph,bg_volume_ph)
+    wav_with_bg = tf.add(sliced_wav,scaled_bg)
+    clamped_wav = tf.clip_by_value(wav_with_bg,-1.0,1.0)
+    spectrogram = contrib_audio.audio_spectrogram(
+        clamped_wav,
+        window_size = window_size_samples,
+        stride = window_stride_samples,
+        magnitude_squared = True
+    )
+    mfcc = contrib_audio.mfcc(
+        spectrogram,
+        sample_rate,
+        dct_coefficient_count = dct_coefficient_count
+    )
+    mfcc_2d = tf.reshape(mfcc,[mfcc.shape[1],mfcc.shape[2]])
+    return mfcc_2d
 
-volume_ph = tf.placeholder(tf.float32,[])
-scaled_wav = tf.multiply(wav_decoder.audio, volume_ph)
-
-time_shift_padding_ph = tf.placeholder(tf.int32,[2,2])
-time_shift_offset_ph = tf.placeholder(tf.int32,[2])
-
-padded_wav = tf.pad(scaled_wav,time_shift_padding_ph,mode="CONSTANT")
-sliced_wav = tf.slice(padded_wav,time_shift_offset_ph,[sample_rate,-1])
-
-bg_ph = tf.placeholder(tf.float32,[sample_rate,1])
-bg_volume_ph = tf.placeholder(tf.float32,[])
-
-scaled_bg = tf.multiply(bg_ph,bg_volume_ph)
-wav_with_bg = tf.add(sliced_wav,scaled_bg)
-clamped_wav = tf.clip_by_value(wav_with_bg,-1.0,1.0)
-
-spectrogram = contrib_audio.audio_spectrogram(
-    clamped_wav,
-    window_size = window_size_samples,
-    stride = window_stride_samples,
-    magnitude_squared = True
+mfcc = tf.map_fn( 
+    distort_wav,
+    [wav_ph, volume_ph, time_shift_padding_ph, time_shift_offset_ph, bg_ph, bg_volume_ph],
+    dtype=tf.float32,
+    parallel_iterations=100
 )
-mfcc = contrib_audio.mfcc(
-    spectrogram,
-    wav_decoder.sample_rate,
-    dct_coefficient_count = dct_coefficient_count
-)
 
-def get_mfcc_and_labels(data_index,batch_size,sess,word2index,offset=0,mode="train",return_labels=True):
-    data = []
+def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,mode="train",return_labels=True):
     labels = []
     if offset + batch_size > len(data_index):
         batch_size = len(data_index) - offset
-
+    
+    ts_pad_list = []
+    ts_off_list = []
+    vol_list = []
+    bg_vol_list = []
+    bg_list = []
+    wav_list = []
     for j in range(batch_size):
         if mode == "train":
             samp_index = np.random.randint(len(data_index))
@@ -173,6 +193,7 @@ def get_mfcc_and_labels(data_index,batch_size,sess,word2index,offset=0,mode="tra
             offset += 1
 
         samp_data = data_index[samp_index]
+        wav_list.append(samp_data["data"])
 
         if mode == "train":
             time_shift_amount = np.random.randint(-max_time_shift_ms,max_time_shift_ms)
@@ -185,6 +206,8 @@ def get_mfcc_and_labels(data_index,batch_size,sess,word2index,offset=0,mode="tra
         else:
             time_shift_padding = [[0,0],[0,0]]
             time_shift_offset = [0,0]
+        ts_pad_list.append(np.array(time_shift_padding))
+        ts_off_list.append(np.array(time_shift_offset))
 
         # add in background for training, or for test/val that are silence
         if mode == "train" or (return_labels and samp_data["label"] == "silence"):
@@ -200,33 +223,32 @@ def get_mfcc_and_labels(data_index,batch_size,sess,word2index,offset=0,mode="tra
         else:
             bg_sliced = np.zeros((sample_rate,1))
             bg_volume = 0
+        bg_list.append(bg_sliced)
+        bg_vol_list.append(bg_volume)
 
         if "label" in samp_data and samp_data["label"] == "silence":
             volume = 0 # zero out the foreground for the silence labels
         else:
             volume = 1
+        vol_list.append(volume)
 
-        feed_dict={
-            wav_filename_ph: samp_data["file"],
-            volume_ph: volume,
-            time_shift_padding_ph: time_shift_padding,
-            time_shift_offset_ph: time_shift_offset,
-            bg_ph: bg_sliced,
-            bg_volume_ph: bg_volume
-        }
-        data.append(sess.run(mfcc,feed_dict=feed_dict))
         if return_labels:
-            samp_label = np.zeros(len(wanted_words))
-            samp_label[word2index[samp_data["label"]]] = 1
-            labels.append(samp_label)
+            labels.append(samp_data["label_array"])
 
-    data = np.concatenate(data,axis=0)
+    feed_dict={
+        wav_ph: np.stack(wav_list),
+        volume_ph: np.stack(vol_list),
+        time_shift_padding_ph: np.stack(ts_pad_list),
+        time_shift_offset_ph: np.stack(ts_off_list),
+        bg_ph: np.stack(bg_list),
+        bg_volume_ph: np.stack(bg_vol_list)
+    }
+    data = sess.run(mfcc,feed_dict=feed_dict)
     if not return_labels:
         return data
     else:
         labels = np.stack(labels,axis=0)
         return data, labels
-
 
 data_index, tom_words, tom_index = load_train_data()
 bg_data = prepare_background_data()
