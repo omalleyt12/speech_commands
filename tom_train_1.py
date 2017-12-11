@@ -10,7 +10,6 @@ from tensorflow.python.ops import io_ops
 from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
 from tensorflow.python.util import compat
 
-sess = tf.InteractiveSession()
 
 batch_size = 100
 eval_step = 500
@@ -33,6 +32,24 @@ window_stride_samples = int(sample_rate * window_stride_ms / 1000)
 dct_coefficient_count = 40 # bins to use for MFCC fingerprint
 percent_test = 10 # test set
 percent_val = 10 # val set
+
+if True:
+    test_dir = "test/audio"
+    test_index = []
+    counter = 0
+    with tf.Session(graph=tf.Graph()) as sess:
+        wav_filename_ph = tf.placeholder(tf.string,[])
+        wav_loader = io_ops.read_file(wav_filename_ph)
+        wav_decoder = contrib_audio.decode_wav(wav_loader,desired_channels=1)
+        for wav_path in gfile.Glob(test_dir + "/*.wav"):
+            if counter % 1000 == 0:
+                print("Test {}".format(counter))
+            counter += 1
+            file_name = os.path.basename(wav_path) 
+            tdata = sess.run(wav_decoder,feed_dict={wav_filename_ph:wav_path}).audio.flatten()
+            test_index.append({"file":wav_path,"identifier":file_name,"data":tdata})
+
+sess = tf.InteractiveSession()
 
 def which_set(wav_path):
     # split into train, test, val sets deterministically
@@ -172,7 +189,7 @@ mfcc = tf.map_fn(
     [wav_ph, volume_ph, time_shift_padding_ph, time_shift_offset_ph, bg_ph, bg_volume_ph],
     dtype=tf.float32,
     parallel_iterations=100
-)
+ )
 
 def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,mode="train",return_labels=True):
     labels = []
@@ -261,8 +278,8 @@ data_index, tom_words, tom_index = load_train_data()
 bg_data = prepare_background_data()
 
 labels_ph = tf.placeholder(tf.float32,[None,len(tom_words)],name="labels_ph")
-train_indices_ph = tf.placeholder(tf.int64,[None]) # used for train accuracy
-val_indices_ph = tf.placeholder(tf.int64,[None]) # used for val accuracy
+train_indices_ph = tf.placeholder(tf.int32,[None]) # used for train accuracy
+val_indices_ph = tf.placeholder(tf.int32,[None]) # used for val accuracy
 
 keep_prob = tf.placeholder(tf.float32,name="keep_prob") # will be 0.5 for training, 1 for test
 
@@ -304,8 +321,12 @@ learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 train_step = tf.train.GradientDescentOptimizer(learning_rate_ph).minimize(cross_entropy_mean)
 
 unknown_val = final_layer[:,1] # bc unknown is the second label for all unknown words
-train_predicted_indices = tf.argmax(final_layer,1)
-val_predicted_indices = tf.where(train_predicted_indices >= len(wanted_words),1,train_predicted_indices)
+train_predicted_indices = tf.argmax(final_layer,axis=1,output_type=tf.int32)
+
+def map_train_indices(train_ind):
+    return tf.cond(train_ind > len(wanted_words),lambda: 1,lambda: train_ind)
+# val_predicted_indices = tf.where(train_predicted_indices >= len(wanted_words),1,train_predicted_indices)
+val_predicted_indices = tf.map_fn(map_train_indices,train_predicted_indices)
 
 train_correct_prediction = tf.equal(train_predicted_indices,train_indices_ph)
 val_correct_prediction = tf.equal(val_predicted_indices,val_indices_ph)
@@ -343,13 +364,14 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             learning_rate_ph: learning_rate,
             keep_prob: 0.5
         })
+        print([type(k) for k in feed_dict.keys()])
         # now here's where we run the real, convnet part
-        train_summary, train_accuracy, cross_ent_val, _, _ = sess.run(
+        train_summary, t_accuracy, cross_ent_val, _, _ = sess.run(
             [merged_summaries,train_accuracy,cross_entropy_mean,train_step,increment_global_step],
             feed_dict=feed_dict
         )
         train_writer.add_summary(train_summary,current_step)
-        tf.logging.info("Step {} Rate {} Accuracy {} Cross Entropy {}".format(current_step,learning_rate,train_accuracy,cross_ent_val))
+        tf.logging.info("Step {} Rate {} Accuracy {} Cross Entropy {}".format(current_step,learning_rate,t_accuracy,cross_ent_val))
 
         if False: #current_step % eval_step == 0 or current_step == sum_steps:
             set_name = "val" if not current_step == sum_steps else "test"
@@ -357,30 +379,20 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             val_size = len(data_index[set_name])
             feed_dict = get_mfcc_and_labels(data_index[set_name],val_size,sess,tom_words,tom_index,mode="val")
             feed_dict.update({keep_prob:1.0})
-            val_summary, val_accuracy, val_cem = sess.run([merged_summaries,val_accuracy,cross_entropy_mean],
+            val_summary, v_accuracy, val_cem = sess.run([merged_summaries,val_accuracy,cross_entropy_mean],
                                                           feed_dict=feed_dict
             )
             val_writer.add_summary(val_summary,current_step)
-            tf.logging.info("{} Accuracy {} Loss {}".format(set_name,val_accuracy,val_cem))
+            tf.logging.info("{} Accuracy {} Loss {}".format(set_name,v_accuracy,val_cem))
 
 # now here's where we run the test classification
 import pandas as pd
 df = pd.DataFrame([],columns=["fname","label"])
 
-test_dir = "test/audio"
-test_index = []
-with tf.Session(graph=tf.Graph()) as sess:
-    wav_filename_ph = tf.placeholder(tf.string,[])
-    wav_loader = io_ops.read_file(wav_filename_ph)
-    wav_decoder = contrib_audio.decode_wav(wav_loader,desired_channels=1)
-    for wav_path in gfile.Glob(test_dir + "/*.wav"):
-        file_name = os.path.basename(wav_path) 
-        tdata = sess.run(wav_decoder,feed_dict={wav_filename_ph:wav_path}).audio.flatten()
-        test_index.append({"file":wav_path,"identifier":file_name,"data":tdata})
 offset = 0
 test_batch_size = 1000
 while offset < len(test_index):
-    feed_dict = get_mfcc_and_labels(test_index,test_batch_size,sess,word2index,offset=offset,mode="test",return_labels=False)
+    feed_dict = get_mfcc_and_labels(test_index,test_batch_size,sess,tom_words,tom_index,offset=offset,mode="test",return_labels=False)
     feed_dict.update({keep_prob:1.0})
     test_pred = sess.run(val_predicted_indices,feed_dict=feed_dict)
     test_labels = [tom_words[tind] for tind in test_pred]
