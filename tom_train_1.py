@@ -1,3 +1,4 @@
+import winsound
 import pandas as pd
 import re
 import math
@@ -10,11 +11,16 @@ from tensorflow.python.platform import gfile
 from tensorflow.python.ops import io_ops
 from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
 from tensorflow.python.util import compat
+import scipy.io.wavfile as sciwav
+
+def play(a):
+    print(a.shape)
+    sciwav.write("testing.wav",a.shape[0],a)
 
 
 batch_size = 100
 eval_step = 500
-training_step_list = [15000,3000]
+training_step_list = [0,0] #[15000,3000]
 learning_rate_list = [0.001,0.0001]
 data_dir = "train/audio"
 summary_dir = "logs" # where to save summary logs for Tensorboard
@@ -126,8 +132,11 @@ def load_train_data():
         for set_name in ['val','test','train']:
             random.shuffle(data_index[set_name])
             for i, rec in enumerate(data_index[set_name]):
+                if i > 100:
+                    break
                 if i % 1000 == 0:
                     print("{} {}".format(set_name,i))
+                wav_path = data_index[set_name][i]["file"]
                 data_index[set_name][i]["data"] = sess.run(wav_decoder,feed_dict={wav_filename_ph:wav_path}).audio.flatten()
 
     return data_index, total_word_list, tomIndex
