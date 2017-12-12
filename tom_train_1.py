@@ -1,3 +1,4 @@
+import pandas as pd
 import re
 import math
 import os
@@ -45,7 +46,7 @@ if False:
             if counter % 1000 == 0:
                 print("Test {}".format(counter))
             counter += 1
-            file_name = os.path.basename(wav_path) 
+            file_name = os.path.basename(wav_path)
             tdata = sess.run(wav_decoder,feed_dict={wav_filename_ph:wav_path}).audio.flatten()
             test_index.append({"file":wav_path,"identifier":file_name,"data":tdata})
 
@@ -90,18 +91,21 @@ def load_train_data():
     other_words = list(set(all_words.keys()).difference(set(wanted_words)))
     total_word_list = wanted_words + other_words
     tomIndex = {w:i for i,w in enumerate(total_word_list)} # this will be used for new labeling criteriay
-    
+
     for k in data_index.keys():
         for i,rec in enumerate(data_index[k]):
             word = data_index[k][i]["train_label"]
-            label_array = np.zeros(len(total_word_list))
-            label_array[tomIndex[word]] = 1
+            train_label_array = np.zeros(len(total_word_list))
+            val_label_array = np.zeros(len(total_word_list))
+            train_label_array[tomIndex[word]] = 1
             if word not in wanted_words:
-                label_array[tomIndex["unknown"]] = 1
+                val_label_array[tomIndex["unknown"]] = 1
                 data_index[k][i]["val_label"] = "unknown"
             else:
+                val_label_array[tomIndex[word]] = 1
                 data_index[k][i]["val_label"] = word
-            data_index[k][i]["label_array"] = label_array
+            data_index[k][i]["train_label_array"] = train_label_array
+            data_index[k][i]["val_label_array"] = val_label_array
 
     silence_wav_path = data_index["train"][0]["file"] # arbitrary, to be used for silence
     for set_name in ['val','test','train']:
@@ -111,33 +115,20 @@ def load_train_data():
         for _ in range(silence_size):
             label_array = np.zeros(len(total_word_list))
             label_array[0] = 1
-            data_index[set_name].append({"label_array":label_array,"train_label":"silence","val_label":"silence","file":silence_wav_path})
-
-        # # add unknown words to val, train, test
-        # random.shuffle(unknown_index[set_name])
-        # unknown_size = int(math.ceil(set_size * unknown_percentage) / 100)
-        # data_index[set_name].extend(unknown_index[set_name][:unknown_size])
+            data_index[set_name].append({"train_label_array":label_array,"val_label_array":label_array,"train_label":"silence","val_label":"silence","file":silence_wav_path})
 
     # randomize each set and load data in-mem
     with tf.Session(graph=tf.Graph()) as sess:
         wav_filename_ph = tf.placeholder(tf.string,[])
         wav_loader = io_ops.read_file(wav_filename_ph)
         wav_decoder = contrib_audio.decode_wav(wav_loader,desired_channels=1)
-        
+
         for set_name in ['val','test','train']:
             random.shuffle(data_index[set_name])
             for i, rec in enumerate(data_index[set_name]):
                 if i % 1000 == 0:
                     print("{} {}".format(set_name,i))
                 data_index[set_name][i]["data"] = sess.run(wav_decoder,feed_dict={wav_filename_ph:wav_path}).audio.flatten()
-    # get word2index mapping
-    word2index = {}
-    for word in all_words:
-        if word in wanted_words_index:
-            word2index[word] = wanted_words_index[word]
-        else:
-            word2index[word] = 1
-    word2index["silence"] = 0
 
     return data_index, total_word_list, tomIndex
 
@@ -184,18 +175,19 @@ def distort_wav(ph_tup):
     mfcc_2d = tf.reshape(mfcc,[mfcc.shape[1],mfcc.shape[2]])
     return mfcc_2d
 
-mfcc = tf.map_fn( 
+mfcc = tf.map_fn(
     distort_wav,
     [wav_ph, volume_ph, time_shift_padding_ph, time_shift_offset_ph, bg_ph, bg_volume_ph],
     dtype=tf.float32,
-    parallel_iterations=100
+    parallel_iterations=100,
+    back_prop=False
  )
 
 def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,mode="train",return_labels=True):
     labels = []
     if offset + batch_size > len(data_index):
         batch_size = len(data_index) - offset
-    
+
     ts_pad_list = []
     ts_off_list = []
     vol_list = []
@@ -252,7 +244,7 @@ def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,
         vol_list.append(volume)
 
         if return_labels:
-            labels.append(samp_data["label_array"])
+            labels.append(samp_data["train_label_array"])
             train_indices_list.append(tom_index[samp_data["train_label"]])
             val_indices_list.append(tom_index[samp_data["val_label"]])
 
@@ -267,7 +259,7 @@ def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,
     # data = sess.run(mfcc,feed_dict=feed_dict)
     if return_labels:
         feed_dict.update({
-            labels_ph: np.stack(labels),
+            train_labels_ph: np.stack(labels),
             train_indices_ph: np.stack(train_indices_list),
             val_indices_ph: np.stack(val_indices_list)
         })
@@ -277,7 +269,7 @@ def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,
 data_index, tom_words, tom_index = load_train_data()
 bg_data = prepare_background_data()
 
-labels_ph = tf.placeholder(tf.float32,[None,len(tom_words)],name="labels_ph")
+train_labels_ph = tf.placeholder(tf.float32,[None,len(tom_words)],name="labels_ph")
 train_indices_ph = tf.placeholder(tf.int32,[None]) # used for train accuracy
 val_indices_ph = tf.placeholder(tf.int32,[None]) # used for val accuracy
 
@@ -314,7 +306,7 @@ bias_3 = tf.Variable(tf.zeros([len(tom_words)]))
 final_layer = tf.matmul(flat_layer,weights_3) + bias_3
 
 # using sigmoid here!! (bc classes are no longer mutually exclusive)
-cross_entropy_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
+cross_entropy_loss = tf.nn.softmax_cross_entropy_with_logits(labels=train_labels_ph, logits=final_layer)
 cross_entropy_mean = tf.reduce_mean(cross_entropy_loss)
 
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
@@ -331,7 +323,7 @@ train_predicted_indices = tf.map_fn(map_layer_to_train_pred,final_layer,parallel
 def map_layer_to_val_pred(x):
     return tf.cond(tf.greater_equal(tf.argmax(x),len(wanted_words)),lambda: 1, lambda: tf.argmax(x,output_type=tf.int32) )
 # val_predicted_indices = tf.where(train_predicted_indices >= len(wanted_words),1,train_predicted_indices)
-val_predicted_indices = tf.map_fn(map_layer_to_val_pred,final_layer,parallel_iterations=100)
+val_predicted_indices = tf.map_fn(map_layer_to_val_pred,final_layer,parallel_iterations=100,dtype=tf.int32)
 
 train_correct_prediction = tf.equal(train_predicted_indices,train_indices_ph)
 val_correct_prediction = tf.equal(val_predicted_indices,val_indices_ph)
@@ -362,7 +354,7 @@ sess.run(tf.global_variables_initializer())
 current_step = 0
 sum_steps = sum(training_step_list)
 for steps, learning_rate in zip(training_step_list,learning_rate_list):
-    for i in range(steps): 
+    for i in range(steps):
         current_step += 1
         feed_dict = get_mfcc_and_labels(data_index["train"],batch_size,sess,tom_words,tom_index)
         feed_dict.update({
@@ -370,12 +362,15 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             keep_prob: 0.5
         })
         # now here's where we run the real, convnet part
-        train_summary, t_accuracy, cross_ent_val, _, _ = sess.run(
-            [merged_summaries,train_accuracy,cross_entropy_mean,train_step,increment_global_step],
-            feed_dict=feed_dict
-        )
-        train_writer.add_summary(train_summary,current_step)
-        tf.logging.info("Step {} Rate {} Accuracy {} Cross Entropy {}".format(current_step,learning_rate,t_accuracy,cross_ent_val))
+        if current_step % 10 == 0:
+            v_ind,train_summary, t_accuracy, cross_ent_val, _, _ = sess.run(
+                [val_predicted_indices,merged_summaries,train_accuracy,cross_entropy_mean,train_step,increment_global_step],
+                feed_dict=feed_dict
+            )
+            train_writer.add_summary(train_summary,current_step)
+            tf.logging.info("Step {} Rate {} Accuracy {} Cross Entropy {}".format(current_step,learning_rate,t_accuracy,cross_ent_val))
+        else:
+            _, _ = sess.run([train_step,increment_global_step],feed_dict)
 
         if current_step % eval_step == 0 or current_step == sum_steps:
             set_name = "val" if not current_step == sum_steps else "test"
@@ -411,4 +406,3 @@ if False:
         df = pd.concat([df,test_batch_df])
 
     df.to_csv("my_guesses_3.csv",index=False)
-
