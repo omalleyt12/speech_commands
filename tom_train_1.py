@@ -337,7 +337,8 @@ val_predicted_indices = tf.map_fn(map_layer_to_val_pred,final_layer,parallel_ite
 train_correct_prediction = tf.equal(train_predicted_indices,train_indices_ph)
 val_correct_prediction = tf.equal(val_predicted_indices,val_indices_ph)
 
-# confusion_matrix = tf.confusion_matrix(val_indices,predicted_indices,num_classes=label_elements)
+train_confusion_matrix = tf.confusion_matrix(train_indices_ph,train_predicted_indices,num_classes=len(tom_words))
+val_confusion_matrix = tf.confusion_matrix(val_indices_ph,val_predicted_indices,num_classes=len(wanted_words))
 
 # don't take unknown into account at all for this
 train_accuracy = tf.reduce_mean(tf.cast(train_correct_prediction,tf.float32))
