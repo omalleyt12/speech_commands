@@ -1,4 +1,4 @@
-import winsound
+# import winsound
 import pandas as pd
 import re
 import math
@@ -20,7 +20,7 @@ def play(a):
 
 batch_size = 100
 eval_step = 500
-training_step_list = [0,0] #[15000,3000]
+training_step_list = [15000,3000] #[15000,3000]
 learning_rate_list = [0.001,0.0001]
 data_dir = "train/audio"
 summary_dir = "logs" # where to save summary logs for Tensorboard
@@ -127,13 +127,13 @@ def load_train_data():
     with tf.Session(graph=tf.Graph()) as sess:
         wav_filename_ph = tf.placeholder(tf.string,[])
         wav_loader = io_ops.read_file(wav_filename_ph)
-        wav_decoder = contrib_audio.decode_wav(wav_loader,desired_channels=1)
+        wav_decoder = contrib_audio.decode_wav(wav_loader,desired_channels=1,desired_samples=sample_rate)
 
         for set_name in ['val','test','train']:
             random.shuffle(data_index[set_name])
             for i, rec in enumerate(data_index[set_name]):
-                if i > 100:
-                    break
+                # if i > 100:
+                #     break
                 if i % 1000 == 0:
                     print("{} {}".format(set_name,i))
                 wav_path = data_index[set_name][i]["file"]
@@ -329,9 +329,9 @@ def map_layer_to_train_pred(x):
 train_predicted_indices = tf.map_fn(map_layer_to_train_pred,final_layer,parallel_iterations=100,dtype=tf.int32)
 
 
+# map words not in wanted_words back to unknown label
 def map_layer_to_val_pred(x):
     return tf.cond(tf.greater_equal(tf.argmax(x),len(wanted_words)),lambda: 1, lambda: tf.argmax(x,output_type=tf.int32) )
-# val_predicted_indices = tf.where(train_predicted_indices >= len(wanted_words),1,train_predicted_indices)
 val_predicted_indices = tf.map_fn(map_layer_to_val_pred,final_layer,parallel_iterations=100,dtype=tf.int32)
 
 train_correct_prediction = tf.equal(train_predicted_indices,train_indices_ph)
@@ -372,8 +372,8 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
         })
         # now here's where we run the real, convnet part
         if current_step % 10 == 0:
-            v_ind,train_summary, t_accuracy, cross_ent_val, _, _ = sess.run(
-                [val_predicted_indices,merged_summaries,train_accuracy,cross_entropy_mean,train_step,increment_global_step],
+            t_ind,train_summary, t_accuracy, cross_ent_val, _, _ = sess.run(
+                [train_predicted_indices,merged_summaries,train_accuracy,cross_entropy_mean,train_step,increment_global_step],
                 feed_dict=feed_dict
             )
             train_writer.add_summary(train_summary,current_step)
@@ -385,13 +385,27 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             set_name = "val" if not current_step == sum_steps else "test"
             # run validation loop
             val_size = len(data_index[set_name])
-            feed_dict = get_mfcc_and_labels(data_index[set_name],1000,sess,tom_words,tom_index,mode="val")
-            feed_dict.update({keep_prob:1.0})
-            val_summary, v_accuracy, val_cem = sess.run([merged_summaries,val_accuracy,cross_entropy_mean],
-                                                          feed_dict=feed_dict
-            )
+            val_offset = 0
+            batches = 0
+            v_acc_total = 0
+            t_acc_total = 0
+            loss_total = 0
+            while val_offset < val_size:
+                feed_dict = get_mfcc_and_labels(data_index[set_name],batch_size,sess,tom_words,tom_index,offset=val_offset,mode="val")
+                feed_dict.update({keep_prob:1.0})
+                val_summary, t_accuracy, v_accuracy, val_cem = sess.run([merged_summaries,train_accuracy,val_accuracy,cross_entropy_mean],
+                                                            feed_dict=feed_dict
+                )
+                val_offset += batch_size
+                batches += 1
+                v_acc_total += v_accuracy
+                t_acc_total += t_accuracy
+                loss_total += val_cem
+            v_acc_avg = v_acc_total / max(batches,1) # for when i don't use a val or test set, don't throw error
+            t_acc_avg = t_acc_total / max(batches,1)
+            loss_avg = loss_total / max(batches,1)
             val_writer.add_summary(val_summary,current_step)
-            tf.logging.info("{} Accuracy {} Loss {}".format(set_name,v_accuracy,val_cem))
+            tf.logging.info("{} Train Accuracy {} Val Accuracy {} Loss {}".format(set_name,t_acc_avg,v_acc_avg,loss_avg))
 
 if False:
     # now here's where we run the test classification
