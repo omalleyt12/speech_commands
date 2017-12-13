@@ -1,3 +1,4 @@
+*.wav
 *.pyc
 *.7z
 logs/*
