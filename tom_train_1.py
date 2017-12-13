@@ -40,7 +40,7 @@ dct_coefficient_count = 40 # bins to use for MFCC fingerprint
 percent_test = 10 # test set
 percent_val = 10 # val set
 
-if False:
+if True:
     test_dir = "test/audio"
     test_index = []
     counter = 0
@@ -407,13 +407,13 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             val_writer.add_summary(val_summary,current_step)
             tf.logging.info("{} Train Accuracy {} Val Accuracy {} Loss {}".format(set_name,t_acc_avg,v_acc_avg,loss_avg))
 
-if False:
+if True:
     # now here's where we run the test classification
     import pandas as pd
     df = pd.DataFrame([],columns=["fname","label"])
 
     offset = 0
-    test_batch_size = 1000
+    test_batch_size = 100
     while offset < len(test_index):
         feed_dict = get_mfcc_and_labels(test_index,test_batch_size,sess,tom_words,tom_index,offset=offset,mode="test",return_labels=False)
         feed_dict.update({keep_prob:1.0})
