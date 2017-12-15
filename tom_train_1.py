@@ -1,3 +1,5 @@
+devving = True
+
 # import winsound
 import pandas as pd
 import re
@@ -6,6 +8,7 @@ import os
 import hashlib
 import random
 import numpy as np
+# np.set_printoptions(threshold='nan')
 import tensorflow as tf
 from tensorflow.python.platform import gfile
 from tensorflow.python.ops import io_ops
@@ -19,8 +22,8 @@ def play(a):
 
 
 batch_size = 100
-eval_step = 500
-training_step_list = [15000,3000] #[15000,3000]
+eval_step = 500 if not devving else 10
+training_step_list = [15000,3000] if not devving else [15,3] #[15000,3000]
 learning_rate_list = [0.001,0.0001]
 data_dir = "train/audio"
 summary_dir = "logs" # where to save summary logs for Tensorboard
@@ -40,7 +43,7 @@ dct_coefficient_count = 40 # bins to use for MFCC fingerprint
 percent_test = 10 # test set
 percent_val = 10 # val set
 
-if True:
+if not devving:
     test_dir = "test/audio"
     test_index = []
     counter = 0
@@ -132,8 +135,8 @@ def load_train_data():
         for set_name in ['val','test','train']:
             random.shuffle(data_index[set_name])
             for i, rec in enumerate(data_index[set_name]):
-                # if i > 100:
-                #     break
+                if devving and i > 100:
+                    break
                 if i % 1000 == 0:
                     print("{} {}".format(set_name,i))
                 wav_path = data_index[set_name][i]["file"]
@@ -207,7 +210,7 @@ def get_mfcc_and_labels(data_index,batch_size,sess,tom_words,tom_index,offset=0,
     val_indices_list = []
     for j in range(batch_size):
         if mode == "train":
-            samp_index = np.random.randint(len(data_index))
+            samp_index = np.random.randint(len(data_index)) if not devving else np.random.randint(99)
         else:
             samp_index = offset
             offset += 1
@@ -391,12 +394,16 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             v_acc_total = 0
             t_acc_total = 0
             loss_total = 0
+            v_conf_mat = np.zeros((len(wanted_words),len(wanted_words)),dtype=np.int32)
+            t_conf_mat = np.zeros((len(tom_words),len(tom_words)),dtype=np.int32)
             while val_offset < val_size:
                 feed_dict = get_mfcc_and_labels(data_index[set_name],batch_size,sess,tom_words,tom_index,offset=val_offset,mode="val")
                 feed_dict.update({keep_prob:1.0})
-                val_summary, t_accuracy, v_accuracy, val_cem = sess.run([merged_summaries,train_accuracy,val_accuracy,cross_entropy_mean],
+                val_summary, tcm, vcm, t_accuracy, v_accuracy, val_cem = sess.run([merged_summaries,train_confusion_matrix,val_confusion_matrix,train_accuracy,val_accuracy,cross_entropy_mean],
                                                             feed_dict=feed_dict
                 )
+                v_conf_mat += vcm
+                t_conf_mat += tcm
                 val_offset += batch_size
                 batches += 1
                 v_acc_total += v_accuracy
@@ -407,8 +414,10 @@ for steps, learning_rate in zip(training_step_list,learning_rate_list):
             loss_avg = loss_total / max(batches,1)
             val_writer.add_summary(val_summary,current_step)
             tf.logging.info("{} Train Accuracy {} Val Accuracy {} Loss {}".format(set_name,t_acc_avg,v_acc_avg,loss_avg))
+            print(v_conf_mat)
+            print(t_conf_mat)
 
-if True:
+if not devving:
     # now here's where we run the test classification
     import pandas as pd
     df = pd.DataFrame([],columns=["fname","label"])
