@@ -170,7 +170,7 @@ wav_ph = tf.placeholder(tf.float32,(None,sample_rate))
 keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 
-features = make_features(wav_ph,"mfcc")
+features = make_features(wav_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 final_layer = orig_conv(features,keep_prob,output_neurons)
@@ -190,8 +190,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_6",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_6",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
