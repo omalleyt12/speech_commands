@@ -1,6 +1,8 @@
 import numpy as np
 from toolz.functoolz import memoize
 
+sample_rate = 16000
+
 def pad(d):
     max_pad = 100
     pad_num = np.random.randint(-max_pad,max_pad)

@@ -27,9 +27,13 @@ def play(a):
     sciwav.write("testing.wav",a.shape[0],a)
     winsound.PlaySound("testing.wav",winsouns.SND_FILENAME)
 
+style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 20000
+learning_rate = 0.001
+decay_every = 2000
+decay_rate = 0.80
 sample_rate = 16000 # per sec
 silence_percentage = 10.0 # what percent of training data should be silence
 unknown_percentage = 10.0 # what percent of training data should be unknown words
@@ -37,8 +41,6 @@ true_unknown_percentage = 10.0 # what percent of words should be complete gooble
 
 
 sess = tf.InteractiveSession()
-tf.logging.set_verbosity(tf.logging.INFO)
-sess.run(tf.global_variables_initializer())
 
 def load_train_data(style="full"):
     """
@@ -82,15 +84,16 @@ def get_unknowns_by_speaker(unknown_index):
                      should_add = False
             if should_add:
                 new_l.append(ele)
+        return new_l
 
     from collections import defaultdict
     unknown_speakers = {}
     for set_name in ['val','test','train']:
         unknown_speakers[set_name] = defaultdict(list)
         for i,rec in enumerate(unknown_index[set_name]):
-            speaker = re.sub(r'_nohash_.*$','',os.path.basename(wav_path))
+            speaker = re.sub(r'_nohash_.*$','',os.path.basename(rec["file"]))
             unknown_speakers[set_name][speaker].append(rec)
-        unknown_speakers[set_name] = unknown_speakers[set_name].items()
+        unknown_speakers[set_name] = unknown_speakers[set_name].items( )
         unknown_speakers[set_name] = [(u[0],unique_words(u[1])) for u in unknown_speakers[set_name]]
         unknown_speakers[set_name] = [u for u in unknown_speakers[set_name] if len(u[1]) > 2]
     return unknown_speakers
@@ -120,14 +123,14 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         recs.append(rec_data)
 
     if mode != "comp": # add silence and unknowns to batches randomly
-        silence_recs = int(batch_size * silence_percentage)
+        silence_recs = int(batch_size * silence_percentage / 100)
         for j in range(silence_recs):
-            silence_rec = pp.add_noise(np.zeros(sample_rate,dtype=np.float32))
+            silence_rec = pp.add_noise(np.zeros(sample_rate,dtype=np.float32),bg_data)
             recs.append(silence_rec)
             labels.append(all_words_index["silence"])
 
         if style == "full":
-            true_unknown_recs = int(batch_size * true_unknown_percentage)
+            true_unknown_recs = int(batch_size * true_unknown_percentage / 100)
             for j in range(true_unknown_recs):
                 speaker_words = 0
                 rand_speaker = np.random.randint(0,len(unknown_speakers[mode]))
@@ -145,7 +148,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                 recs.append(tu_rec)
                 labels.append(len(all_words) -1) # this "true_unknown"
         else:
-            unknown_recs = int(batch_size * unknown_percentage)
+            unknown_recs = int(batch_size * unknown_percentage / 100)
             for j in range(unknown_recs):
                 rand_unknown = np.random.randint(0,len(unknown_index[mode]))
                 u_rec = unknown_index[mode][rand_unknown]["data"]
@@ -154,29 +157,29 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
 
     feed_dict={ wav_ph: np.stack(recs)}
     if mode != "comp":
-        feed_dict[label_ph] = np.stack(labels)
+        feed_dict[labels_ph] = np.stack(labels).astype(np.int32)
     return feed_dict
 
 
-data_index, unknown_index = load_train_data()
-unknown_speakers = get_unknown_speakers(unknown_index)
-bg_data = load_bg_data()
+data_index, unknown_index = load_train_data(style=style)
+unknown_speakers = get_unknowns_by_speaker(unknown_index)
+bg_data = wl.load_bg_data(sess)
 
-labels_ph = tf.placeholder(tf.float32,(None),name="labels_input")
-wav_ph = tf.placeholder(tf.float32,(None,sample_rate),name="wav_input")
-keep_prob = tf.placeholder(tf.float32,name="keep_prob") # will be 0.5 for training, 1 for test
+labels_ph = tf.placeholder(tf.int32,(None))
+wav_ph = tf.placeholder(tf.float32,(None,sample_rate))
+keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 
-features = make_features(wav_ph,"log-mel")
+features = make_features(wav_ph,"mfcc")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 final_layer = orig_conv(features,keep_prob,output_neurons)
 
-loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=train_labels_ph, logits=final_layer)
-loss_mean = tf.reduce_mean(cross_entropy_loss)
+loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
+loss_mean = tf.reduce_mean(loss)
 
-train_step = tf.train.GradientDescentOptimizer(0.001).minimize(loss_mean)
-predictions = tf.argmax(final_layer,1)
+train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(loss_mean)
+predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
 confusion_matrix = tf.confusion_matrix(labels_ph,predictions,num_classes=output_neurons)
 accuracy_tensor = tf.reduce_mean(tf.cast(is_correct,tf.float32))
@@ -184,16 +187,20 @@ global_step = tf.train.get_or_create_global_step()
 increment_global_step = tf.assign(global_step,global_step + 1)
 
 saver = tf.train.Saver(tf.global_variables())
-tf.summary.scalar("cross_entropy",cross_entropy_mean)
+tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
 train_writer = tf.summary.FileWriter("logs/train",sess.graph)
 val_writer = tf.summary.FileWriter("logs/val",sess.graph)
 
 
+tf.logging.set_verbosity(tf.logging.INFO)
+sess.run(tf.global_variables_initializer())
 for i in range(steps):
-    feed_dict = get_batch(data_index["train"],batch_size,sess,tom_words,tom_index)
-    feed_dict.update({keep_prob: 0.75})
+    if i > 0 and i % decay_every == 0:
+        learning_rate = learning_rate * decay_rate
+    feed_dict = get_batch(data_index["train"],batch_size,style=style)
+    feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate})
     # now here's where we run the real, convnet part
     if i % 10 == 0:
         sum_val,acc_val,loss_val, _ = sess.run([merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
@@ -210,13 +217,14 @@ for i in range(steps):
         val_loss = RunningAverage()
         val_conf_mat = np.zeros((output_neurons,output_neurons))
         while val_offset < val_size:
-            feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val")
+            feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
             feed_dict.update({keep_prob:1.0})
-            val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([merged_summaries,accuracy_tensor,loss_mean,confusion_matrix])
+            val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([merged_summaries,accuracy_tensor,loss_mean,confusion_matrix],feed_dict)
             val_writer.add_summary(val_sum_val,i)
             val_acc.add(val_acc_val)
             val_loss.add(val_loss_val)
             val_conf_mat += val_conf_mat_val
+            val_offset += batch_size
         tf.logging.info("{} Step {} Val Accuracy {} Loss {}".format(set_name,i,val_acc,val_loss))
         df_words = all_words if style == "full" else wanted_words
         pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(i))
@@ -228,10 +236,10 @@ df = pd.DataFrame([],columns=["fname","label"])
 offset = 0
 test_batch_size = 100
 while offset < len(test_index):
-    feed_dict = get_batch(test_index,test_batch_size,offset=offset,mode="comp")
-    feed_dict.update({keep_prob:1.0})
+    feed_dict = get_batch(test_index,test_batch_size,offset=offset,mode="comp",style=style)
+    feed_dict.update({ keep_prob:1.0})
     test_pred = sess.run(predictions,feed_dict=feed_dict)
-    test_labels = [all_words_index[test_index] for test_index in test_pred]
+    test_labels = [all_words[test_index] for test_index in test_pred]
     for i in range(len(test_labels)):
         if test_labels[i] not in wanted_words:
             test_labels[i] = "unknown"

@@ -3,6 +3,7 @@ import numpy as np
 from toolz.functoolz import memoize
 from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
 
+sample_rate = 16000
 window_size_samples = 30 * 16 # ms * samples/ms
 window_stride_samples = 10 * 16
 
@@ -35,7 +36,7 @@ def make_log_mel_fb(sig,name=None):
 def make_mfccs(sig):
     def make_1_mfcc(s):
         spectrogram = contrib_audio.audio_spectrogram(
-            s,
+            tf.reshape(s,(s.shape[0],1)),
             window_size = window_size_samples,
             stride = window_stride_samples,
             magnitude_squared = True
