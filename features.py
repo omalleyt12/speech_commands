@@ -10,8 +10,10 @@ window_stride_samples = 10 * 16
 
 def make_features(wavs,name="log-mel"):
     if name == "log-mel":
+        print("Features: Log Mel")
         return make_log_mel_fb(wavs)
     else:
+        print("Features: MFCC")
         return make_mfccs(wavs)
 
 # Different features from preprocessing
@@ -22,7 +24,7 @@ def make_log_mel_fb(sig,name=None):
         magnitude_spectrograms = tf.abs(stfts)
         # Warp the linear-scale, magnitude spectrograms into the mel-scale.
         num_spectrogram_bins = magnitude_spectrograms.shape[-1].value
-        lower_edge_hertz, upper_edge_hertz, num_mel_bins = 80.0, 7600.0, 98
+        lower_edge_hertz, upper_edge_hertz, num_mel_bins = 80.0, 7600.0, 40
         linear_to_mel_weight_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(
           num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz,
           upper_edge_hertz)
