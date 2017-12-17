@@ -72,8 +72,8 @@ def orig_with_extra_fc(features,keep_prob,num_final_neurons):
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
-    fc_1_neurons = 512
-    fc_2_neurons = 256
+    fc_1_neurons = 1024
+    fc_2_neurons = 512
 
     def make_vgg_conv_layer(in_layer,in_channels,out_channels,name="conv_layer",maxpool=False):
         with tf.name_scope(name,"vgg_conv_layer") as scope:
@@ -123,5 +123,39 @@ def vggnet(features,keep_prob,num_final_neurons):
     final_layer = make_vgg_fc_layer(fc_2_out,fc_2_neurons,num_final_neurons,keep_prob,name="final_layer")
 
     return final_layer
+
+def oned_conv(features,keep_prob,num_final_neurons):
+    """Working off of architecture shared by ttagu99 at https://www.kaggle.com/c/tensorflow-speech-recognition-challenge/discussion/44283"""
+    f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
+
+    def make_conv(in_layer,out_channels,maxpool=False):
+        relu = tf.contrib.layers.conv2d(in_layer,out_channels,[3,1],[1,1])
+        if maxpool:
+            return tf.nn.max_pool(relu,[1,2,1,1],[1,2,1,1],"VALID")
+        return relu
+
+    def make_fc_layer(in_layer,out_neurons,keep_prob,name="fc_layer"):
+        with tf.name_scope(name,"fc_layer") as scope:
+            relu = tf.contrib.layers.fully_connected(in_layer,out_neurons)
+            dropout = tf.nn.dropout(relu,keep_prob)
+            return dropout
+
+    c1 = make_conv(f,8,maxpool=True)
+    c2 = make_conv(c1,16,maxpool=True)
+    c3 = make_conv(c2,32,maxpool=True)
+    c4 = make_conv(c3,64,maxpool=True)
+    c5 = make_conv(c4,128,maxpool=True)
+    c_last = make_conv(c5,256,maxpool=True)
+
+
+    _, h, w, c = c_last.get_shape()
+    flattened_conv = tf.reshape(c_last,[-1,h*w*c])
+
+    print("Flattened Conv Shape {}".format(h*w*c))
+
+    final_layer = make_fc_layer(flattened_conv,num_final_neurons,keep_prob)
+    return final_layer
+
+
 
 
