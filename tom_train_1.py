@@ -27,7 +27,7 @@ def play(a):
     sciwav.write("testing.wav",a.shape[0],a)
     winsound.PlaySound("testing.wav",winsouns.SND_FILENAME)
 
-style = "full"
+style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 20000
@@ -35,8 +35,8 @@ learning_rate = 0.001
 decay_every = 2000
 decay_rate = 0.80
 sample_rate = 16000 # per sec
-silence_percentage = 10.0 if style ==  "unknown" else 3 # what percent of training data should be silence
-unknown_percentage = 10.0 if style == "unknown" else 3 # what percent of training data should be unknown words
+silence_percentage = 10.0 # what percent of training data should be silence
+unknown_percentage = 10.0 # what percent of training data should be unknown words
 true_unknown_percentage = 10.0 # what percent of words should be complete goobledyguk
 
 
@@ -173,7 +173,7 @@ learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 features = make_features(wav_ph,"mfcc")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = orig_conv(features,keep_prob,output_neurons)
+final_layer = orig_with_extra_fc(features,keep_prob,output_neurons)
 
 loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
