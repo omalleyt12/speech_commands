@@ -12,9 +12,12 @@ def make_features(wavs,name="log-mel"):
     if name == "log-mel":
         print("Features: Log Mel")
         return make_log_mel_fb(wavs)
-    else:
+    elif name == "mfcc":
         print("Features: MFCC")
         return make_mfccs(wavs)
+    else:
+        print("Features: Identity")
+        return wavs
 
 # Different features from preprocessing
 # this will generate 64 features
