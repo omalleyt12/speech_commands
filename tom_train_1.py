@@ -25,15 +25,15 @@ def play(a):
     import winsound
     print(a.shape)
     sciwav.write("testing.wav",a.shape[0],a)
-    winsound.PlaySound("testing.wav",winsouns.SND_FILENAME)
+    winsound.PlaySound("testing.wav",winsound.SND_FILENAME)
 
 style = "unknown"
 batch_size = 100
 eval_step = 500
-steps = 20000
-learning_rate = 0.001
-decay_every = 2000
-decay_rate = 0.80
+steps = 200000
+learning_rate = 0.01
+# decay_every = 2000
+decay_rate = 0.10
 sample_rate = 16000 # per sec
 silence_percentage = 10.0 # what percent of training data should be silence
 unknown_percentage = 10.0 # what percent of training data should be unknown words
@@ -173,12 +173,12 @@ learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 features = make_features(wav_ph,"mfcc")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = orig_with_extra_fc(features,keep_prob,output_neurons)
+final_layer = vggnet(features,keep_prob,output_neurons)
 
 loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
 
-train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(loss_mean)
+train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(loss_mean)
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
 confusion_matrix = tf.confusion_matrix(labels_ph,predictions,num_classes=output_neurons)
@@ -190,15 +190,16 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_mfcc_extrafc",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_mfcc_extrafc",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_mfcc_vggnetlite",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_mfcc_vggnetlite",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
 sess.run(tf.global_variables_initializer())
+last_val_accuracy = 0
 for i in range(steps):
-    if i > 0 and i % decay_every == 0:
-        learning_rate = learning_rate * decay_rate
+    # if i > 0 and i % decay_every == 0:
+    #     learning_rate = learning_rate * decay_rate
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
     feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate})
     # now here's where we run the real, convnet part
@@ -228,6 +229,14 @@ for i in range(steps):
         tf.logging.info("{} Step {} Val Accuracy {} Loss {}".format(set_name,i,val_acc,val_loss))
         df_words = all_words if style == "full" else wanted_words
         pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(i))
+
+        if val_acc.calculate() < last_val_accuracy:
+            learning_rate = decay_rate*learning_rate
+            print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
+        last_val_accuracy = val_acc.calculate()
+
+    if learning_rate < 0.00001: # at this point, just stop
+        break
 
 test_index = wl.load_test_data(sess)
 # now here's where we run the test classification

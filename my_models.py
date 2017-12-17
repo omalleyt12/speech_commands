@@ -72,50 +72,49 @@ def orig_with_extra_fc(features,keep_prob,num_final_neurons):
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
-    conv_1_channels = 64
-    conv_2_channels = 128
-    conv_3_channels = 256
-    conv_4_channels = 512
-    conv_5_channels = 512
-
-    fc_1_neurons = 4096
-    fc_2_neurons = 4096
+    fc_1_neurons = 512
+    fc_2_neurons = 256
 
     def make_vgg_conv_layer(in_layer,in_channels,out_channels,name="conv_layer",maxpool=False):
         with tf.name_scope(name,"vgg_conv_layer") as scope:
-            weights = tf.Variable(tf.truncated_normal([3,3,in_channels,out_channels],stddev=0.01))
-            bias = tf.Variable(tf.zeros([out_channels]))
-            conv = tf.nn.conv2d(in_layer,weights,[1,1,1,1],"SAME") + bias
-            relu = tf.nn.relu(conv)
+            relu = tf.contrib.layers.conv2d(in_layer,out_channels,[3,3],[1,1])
             if maxpool:
-                return tf.nn.max_pool(relu,[1,2,2,1],[1,2,2,1],"SAME")
+                return tf.nn.max_pool(relu,[1,2,2,1],[1,2,2,1],"VALID")
             return relu
 
     def make_vgg_fc_layer(in_layer,in_neurons,out_neurons,keep_prob,name="fc_layer"):
         with tf.name_scope(name,"vgg_fc_layer") as scope:
-            weights = tf.Variable(tf.truncated_normal([in_neurons,out_neurons],stddev=0.01))
-            bias = tf.Variable(tf.zeros(out_neurons))
-            relu = tf.nn.relu(tf.matmul(in_layer,weights) + bias)
+            relu = tf.contrib.layers.fully_connected(in_layer,out_neurons)
             dropout = tf.nn.dropout(relu,keep_prob)
             return dropout
 
-    c1 = make_vgg_conv_layer(features,1,64,name="layer_1")
-    c2 = make_vgg_conv_layer(c1,64,64,name="layer_2",maxpool=True)
-    c3 = make_vgg_conv_layer(c2,64,128,name="layer_3")
-    c4 = make_vgg_conv_layer(c3,128,128,name="layer_4",maxpool=True)
-    c5 = make_vgg_conv_layer(c4,128,256,name="layer_5")
-    c6 = make_vgg_conv_layer(c5,256,256,name="layer_6")
-    c7 = make_vgg_conv_layer(c6,256,256,name="layer_7",maxpool=True)
-    c8 = make_vgg_conv_layer(c7,256,512,name="layer_8")
-    c9 = make_vgg_conv_layer(c8,512,512,name="layer_9")
-    c10 = make_vgg_conv_layer(c9,512,512,name="layer_10",maxpool=True)
-    c11 = make_vgg_conv_layer(c10,512,512,name="layer_11")
-    c12 = make_vgg_conv_layer(c11,512,512,name="layer_12")
-    c13 = make_vgg_conv_layer(c12,512,512,name="layer_13",maxpool=True)
+    # c1 = make_vgg_conv_layer(features,1,64,name="layer_1")
+    # c2 = make_vgg_conv_layer(c1,64,64,name="layer_2",maxpool=True)
+    # c3 = make_vgg_conv_layer(c2,64,128,name="layer_3")
+    # c4 = make_vgg_conv_layer(c3,128,128,name="layer_4",maxpool=True)
+    # c5 = make_vgg_conv_layer(c4,128,256,name="layer_5")
+    # c6 = make_vgg_conv_layer(c5,256,256,name="layer_6")
+    # c7 = make_vgg_conv_layer(c6,256,256,name="layer_7",maxpool=True)
+    # c8 = make_vgg_conv_layer(c7,256,512,name="layer_8")
+    # c9 = make_vgg_conv_layer(c8,512,512,name="layer_9")
+    # c10 = make_vgg_conv_layer(c9,512,512,name="layer_10",maxpool=True)
+    # c11 = make_vgg_conv_layer(c10,512,512,name="layer_11")
+    # c12 = make_vgg_conv_layer(c11,512,512,name="layer_12")
+    # c_last = make_vgg_conv_layer(c12,512,512,name="layer_13",maxpool=True)
 
-    _, h, w, c = c13.get_shape()
+    c1 = make_vgg_conv_layer(fingerprint_4d,1,64,name="layer_1",maxpool=True)
+    c2 = make_vgg_conv_layer(c1,64,128,name="layer_2",maxpool=True)
+    c3 = make_vgg_conv_layer(c2,128,256,name="layer_3")
+    c4 = make_vgg_conv_layer(c3,256,256,name="layer_4",maxpool=True)
+    # c5 = make_vgg_conv_layer(c4,256,512,name="layer_5")
+    # c6 = make_vgg_conv_layer(c5,512,512,name="layer_6",maxpool=True)
+    # c7 = make_vgg_conv_layer(c6,512,512,name="layer_7")
+    c_last = make_vgg_conv_layer(c4,512,512,name="layer_8",maxpool=True)
 
-    flattened_conv = tf.reshape(c13,[-1,h*w*c])
+
+    _, h, w, c = c_last.get_shape()
+
+    flattened_conv = tf.reshape(c_last,[-1,h*w*c])
 
     print("Flattened Conv Shape {}".format(h*w*c))
 
