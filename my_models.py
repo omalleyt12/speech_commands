@@ -81,11 +81,8 @@ def vggnet(features,keep_prob,num_final_neurons):
         with tf.name_scope(name,"vgg_conv_layer") as scope:
             relu = tf.contrib.layers.conv2d(in_layer,out_channels,[3,3],[1,1])
             if maxpool:
-                maxpool = tf.nn.max_pool(relu,[1,2,2,1],[1,2,2,1],"VALID")
-            else:
-                maxpool = tf.identity(relu)
-            # return tf.nn.dropout(maxpool,keep_prob)
-            return maxpool
+                return tf.nn.max_pool(relu,[1,2,2,1],[1,2,2,1],"VALID")
+            return relu
 
     def make_vgg_fc_layer(in_layer,in_neurons,out_neurons,keep_prob,name="fc_layer"):
         with tf.name_scope(name,"vgg_fc_layer") as scope:
@@ -181,6 +178,26 @@ def oned_conv(features,keep_prob,num_final_neurons):
 
     return final_layer
 
+def tom_oned(features,keep_prob,num_final_neurons):
+    f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
 
+    def make_conv(in_layer,out_channels,maxpool=False):
+        relu = tf.contrib.layers.conv2d(in_layer,out_channels,[3,1],[1,1])
+        if maxpool:
+            return tf.nn.max_pool(relu,[1,2,1,1],[1,2,1,1],"VALID")
+        return relu
 
+    def make_fc_layer(in_layer,out_neurons,keep_prob,name="fc_layer"):
+        with tf.name_scope(name,"fc_layer") as scope:
+            relu = tf.contrib.layers.fully_connected(in_layer,out_neurons)
+            dropout = tf.nn.dropout(relu,keep_prob)
+            return dropout
+
+    c1 = make_conv(f,8)
+    c2 = make_conv(c1,64,maxpool=True)
+    c3 = make_conv(c2,128)
+    c4 = make_conv(c3,256)
+    c5 = make_conv(c4,256,maxpool=True)
+    c6 = make_conv(c5,512,maxpool=True)
+    c7 = make_conv(c6,512,maxpool=True)
 
