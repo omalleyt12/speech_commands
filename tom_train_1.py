@@ -190,8 +190,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_mfcc_vggnetlite_biggestFC",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_mfcc_vggnetlite_biggestFC",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_mfcc_vggnetlite_biggestFC_90_keepprob",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_mfcc_vggnetlite_biggestFC_90_keepprob",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -201,7 +201,7 @@ for i in range(steps):
     # if i > 0 and i % decay_every == 0:
     #     learning_rate = learning_rate * decay_rate
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
-    feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate})
+    feed_dict.update({keep_prob: 0.9,learning_rate_ph:learning_rate})
     # now here's where we run the real, convnet part
     if i % 10 == 0:
         sum_val,acc_val,loss_val, _ = sess.run([merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
