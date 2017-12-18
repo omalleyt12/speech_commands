@@ -81,8 +81,11 @@ def vggnet(features,keep_prob,num_final_neurons):
         with tf.name_scope(name,"vgg_conv_layer") as scope:
             relu = tf.contrib.layers.conv2d(in_layer,out_channels,[3,3],[1,1])
             if maxpool:
-                return tf.nn.max_pool(relu,[1,2,2,1],[1,2,2,1],"VALID")
-            return relu
+                maxpool = tf.nn.max_pool(relu,[1,2,2,1],[1,2,2,1],"VALID")
+            else:
+                maxpool = tf.identity(relu)
+            # return tf.nn.dropout(maxpool,keep_prob)
+            return maxpool
 
     def make_vgg_fc_layer(in_layer,in_neurons,out_neurons,keep_prob,name="fc_layer"):
         with tf.name_scope(name,"vgg_fc_layer") as scope:
@@ -142,7 +145,6 @@ def vggnet(features,keep_prob,num_final_neurons):
 
 #     def make_inception(in_layer):
 
-    
 
 
 def oned_conv(features,keep_prob,num_final_neurons):
@@ -174,7 +176,9 @@ def oned_conv(features,keep_prob,num_final_neurons):
 
     print("Flattened Conv Shape {}".format(h*w*c))
 
-    final_layer = make_fc_layer(flattened_conv,num_final_neurons,keep_prob)
+    fc1 = make_fc_layer(flattened_conv,1024,keep_prob)
+    final_layer = make_fc_layer(fc1,num_final_neurons,keep_prob)
+
     return final_layer
 
 
