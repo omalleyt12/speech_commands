@@ -144,7 +144,7 @@ def vggnet(features,keep_prob,num_final_neurons):
 
 
 
-def oned_conv(features,keep_prob,num_final_neurons):
+def oned_conv(features,keep_prob,num_final_neurons,is_training):
     """Working off of architecture shared by ttagu99 at https://www.kaggle.com/c/tensorflow-speech-recognition-challenge/discussion/44283"""
     f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
 
@@ -157,8 +157,9 @@ def oned_conv(features,keep_prob,num_final_neurons):
     def make_fc_layer(in_layer,out_neurons,keep_prob,name="fc_layer"):
         with tf.name_scope(name,"fc_layer") as scope:
             relu = tf.contrib.layers.fully_connected(in_layer,out_neurons)
-            dropout = tf.nn.dropout(relu,keep_prob)
-            return dropout
+            # dropout = tf.nn.dropout(relu,keep_prob)
+            # return dropout
+            return relu
 
     c1 = make_conv(f,8,maxpool=True)
     c2 = make_conv(c1,16,maxpool=True)
