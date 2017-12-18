@@ -201,7 +201,7 @@ for i in range(steps):
     # if i > 0 and i % decay_every == 0:
     #     learning_rate = learning_rate * decay_rate
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
-    feed_dict.update({keep_prob: 0.9,learning_rate_ph:learning_rate})
+    feed_dict.update({keep_prob: 0.6,learning_rate_ph:learning_rate})
     # now here's where we run the real, convnet part
     if i % 10 == 0:
         sum_val,acc_val,loss_val, _ = sess.run([merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
