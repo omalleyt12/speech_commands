@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 from toolz.functoolz import memoize
 
 sample_rate = 16000
@@ -39,3 +40,70 @@ def get_sigmoid_blender(num):
 def combine(d1,d2):
     sb = get_sigmoid_blender(d1.shape[0])
     return d1*sb + d2*(1 - sb)
+
+def resample(a,samples=16000):
+    resampler = interp1d(np.arange(a.shape[0]),a,kind='linear')
+    return resampler((np.linspace(0,a.shape[0]-1,samples,endpoint=False))).astype(np.float32)
+
+def speedx(a):
+    speed = np.random.uniform(0.85,1.15)
+    samples = int(sample_rate / speed)
+    a = resample(a,samples)
+    sample_diff = abs(samples - sample_rate)
+    left_samples = np.random.randint(0,sample_diff)
+    right_samples = sample_diff - left_samples
+    if speed > 1:
+        return np.pad(a,(left_samples,right_samples),mode='constant')
+    else:
+        return a[left_samples:-right_samples]
+
+def wraparound(a):
+    cut = np.random.randint(0,a.shape[0])
+    print(cut)
+    return np.append(a[cut:],a[:cut])
+
+def pitch_shift(a,pitch):
+    sampling_rate = 16000
+    chunk = 300
+    overlap = 0.75
+    hop_in = int((1-overlap)*chunk)
+    resample_x = 2**(pitch/12)
+    hop_out = int(hop_in*resample_x)
+
+    def stft(x):
+        h = sp.hanning(chunk)
+        X = np.array([np.fft.fft(h*x[i:i+chunk]) for i in range(0, len(x)-chunk, hop_in)])
+        return X
+
+    def istft(X):
+        h = sp.hanning(chunk)
+        x = np.zeros(len(X) * (hop_out))
+        for n, i in enumerate(range(0, len(x)-chunk, hop_out)):
+            x[i:i+chunk] += h*np.real(np.fft.ifft(X[n]))
+        return x
+
+    def vocode(frame1,frame2,phase_shift):
+        delta_t = hop_in / sampling_rate
+
+        phase_change = np.angle(frame2) - np.angle(frame1)
+
+        freq_deviation = (phase_change)/delta_t - frame2
+        freq_dev_angle = np.mod(np.angle(freq_deviation) + np.pi,2*np.pi) - np.pi
+        freq_dev_mag = np.abs(freq_deviation)
+        wrapped_freq_deviation = freq_dev_mag * np.exp(freq_dev_angle*1j)
+        true_freq = frame2 + wrapped_freq_deviation # this is the true frequency given that things fall bt bins
+
+        phase_shift += delta_t * true_freq
+        true_bins = np.abs(frame2)*np.exp(np.angle(phase_shift)*1j)
+        return true_bins,phase_shift
+
+
+    s = stft(a)
+    s_vocoded = np.zeros(s.shape)
+    phase_shift = np.zeros(s.shape[1],dtype=np.complex128)
+    s_vocoded[0,:] = s[0,:]
+    for i,frames in enumerate(zip(s[:-1],s[1:])):
+        s_vocoded[i+1,:], phase_shift = vocode(frames[0],frames[1],phase_shift)
+
+    a_shifted = istft(s).astype(np.float32)
+    return resample(a_shifted,sample_rate)
