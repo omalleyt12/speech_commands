@@ -5,6 +5,7 @@
 logs/*
 train/*
 test/*
+checkpoints/*
 *.csv
 
 __pycache__/
