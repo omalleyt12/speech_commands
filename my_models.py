@@ -104,6 +104,7 @@ def vggnet(features,keep_prob,num_final_neurons):
     # c12 = make_vgg_conv_layer(c11,512,512,name="layer_12")
     # c_last = make_vgg_conv_layer(c12,512,512,name="layer_13",maxpool=True)
 
+    # This worked for my best-performing model yet
     c1 = make_vgg_conv_layer(fingerprint_4d,1,64,name="layer_1",maxpool=True)
     c2 = make_vgg_conv_layer(c1,64,128,name="layer_2",maxpool=True)
     c3 = make_vgg_conv_layer(c2,128,256,name="layer_3")
@@ -112,6 +113,16 @@ def vggnet(features,keep_prob,num_final_neurons):
     # c6 = make_vgg_conv_layer(c5,512,512,name="layer_6",maxpool=True)
     # c7 = make_vgg_conv_layer(c6,512,512,name="layer_7")
     c_last = make_vgg_conv_layer(c4,512,512,name="layer_8",maxpool=True)
+
+
+    # c1 = make_vgg_conv_layer(fingerprint_4d,1,64,name="layer_1",maxpool=True)
+    # c2 = make_vgg_conv_layer(c1,64,128,name="layer_2",maxpool=True)
+    # c3 = make_vgg_conv_layer(c2,128,256,name="layer_3")
+    # c4 = make_vgg_conv_layer(c3,256,256,name="layer_4",maxpool=True)
+    # c5 = make_vgg_conv_layer(c4,256,512,name="layer_5")
+    # c6 = make_vgg_conv_layer(c5,512,512,name="layer_6",maxpool=True)
+    # c7 = make_vgg_conv_layer(c6,512,512,name="layer_7")
+    # c_last = make_vgg_conv_layer(c7,512,512,name="layer_8",maxpool=True)
 
 
     _, h, w, c = c_last.get_shape()
@@ -125,6 +136,14 @@ def vggnet(features,keep_prob,num_final_neurons):
     final_layer = make_vgg_fc_layer(fc_2_out,fc_2_neurons,num_final_neurons,keep_prob,name="final_layer")
 
     return final_layer
+
+# def inception(features,keep_prob,num_final_neurons):
+#     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+#     def make_inception(in_layer):
+
+    
+
 
 def oned_conv(features,keep_prob,num_final_neurons):
     """Working off of architecture shared by ttagu99 at https://www.kaggle.com/c/tensorflow-speech-recognition-challenge/discussion/44283"""
