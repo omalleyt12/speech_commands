@@ -72,8 +72,8 @@ def orig_with_extra_fc(features,keep_prob,num_final_neurons):
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
-    fc_1_neurons = 4096
-    fc_2_neurons = 4096
+    fc_1_neurons = 3000
+    fc_2_neurons = 1500
 
     print("Using {} neurons in FC Layers".format(fc_2_neurons))
 
