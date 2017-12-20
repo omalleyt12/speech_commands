@@ -11,7 +11,7 @@ def get_word(wav,percent_wav=0.5):
     chunk_size = 50
     keep_chunks = int(chunk_size*percent_wav)
     chunks = np.array_split(wav,50)
-    dbs = [20*np.log10( np.sqrt(np.mean(chunk**2)) ) for chunk in chunks]
+    dbs = [20*np.log10( np.sqrt(np.mean(chunk**2)) + 1e-8) for chunk in chunks]
     rolling_avg_db = np.array([np.mean(dbs[i:i+keep_chunks]) for i in range(0,chunk_size - keep_chunks + 1)])
     max_chunk_start = np.argmax(rolling_avg_db)
     return np.concatenate(chunks[max_chunk_start:max_chunk_start+keep_chunks])
