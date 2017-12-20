@@ -194,8 +194,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_driveconv1",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_driveconv1",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_driveconv1_2",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_driveconv1_2",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -231,7 +231,9 @@ for i in range(steps):
             val_offset += batch_size
         tf.logging.info("{} Step {} Val Accuracy {} Loss {}".format(set_name,i,val_acc,val_loss))
         df_words = all_words if style == "full" else wanted_words
-        pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(i))
+
+        if set_name == "test":
+            pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(i))
 
         if val_acc.calculate() < last_val_accuracy and i > 500:
             learning_rate = decay_rate*learning_rate
