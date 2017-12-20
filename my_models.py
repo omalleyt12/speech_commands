@@ -129,6 +129,9 @@ def vggnet(features,keep_prob,num_final_neurons):
 
     flattened_conv = tf.reshape(c_last,[-1,h*w*c])
 
+    print("Flattened Conv Height {}".format(h))
+    print("Flattened Conv Width {}".format(w))
+
     print("Flattened Conv Shape {}".format(h*w*c))
 
     fc_1_out = make_vgg_fc_layer(flattened_conv,h*w*c,fc_1_neurons,keep_prob,name="fc_1")
@@ -149,7 +152,7 @@ def oned_conv(features,keep_prob,num_final_neurons,is_training):
     f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
 
     def make_conv(in_layer,out_channels,maxpool=False):
-        relu = tf.contrib.layers.conv2d(in_layer,out_channels,[3,1],[1,1])
+        relu = tf.contrib.layers.conv2d(in_layer,out_channels,[3,1],[1,1]) #,normalizer_fn=tf.contrib.layers.batch_norm,normalizer_params={"is_training":is_training})
         if maxpool:
             return tf.nn.max_pool(relu,[1,2,1,1],[1,2,1,1],"VALID")
         return relu
@@ -166,13 +169,17 @@ def oned_conv(features,keep_prob,num_final_neurons,is_training):
     c3 = make_conv(c2,32,maxpool=True)
     c4 = make_conv(c3,64,maxpool=True)
     c5 = make_conv(c4,128,maxpool=True)
-    c_last = make_conv(c5,256,maxpool=True)
-
+    c6 = make_conv(c5,256,maxpool=True)
+    c7 = make_conv(c6,512,maxpool=True)
+    c8 = make_conv(c7,512,maxpool=True)
+    c9 = make_conv(c8,512,maxpool=True)
+    c_last = make_conv(c9,512,maxpool=True)
 
     _, h, w, c = c_last.get_shape()
     flattened_conv = tf.reshape(c_last,[-1,h*w*c])
 
     print("Flattened Conv Shape {}".format(h*w*c))
+    print("Flattened Conv Spatial {}".format(h))
 
     fc1 = make_fc_layer(flattened_conv,1024,keep_prob)
     final_layer = make_fc_layer(fc1,num_final_neurons,keep_prob)
@@ -182,8 +189,8 @@ def oned_conv(features,keep_prob,num_final_neurons,is_training):
 def tom_oned(features,keep_prob,num_final_neurons):
     f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
 
-    def make_conv(in_layer,out_channels,maxpool=False):
-        relu = tf.contrib.layers.conv2d(in_layer,out_channels,[3,1],[1,1])
+    def make_conv(in_layer,out_channels,kernel_size,maxpool=False):
+        relu = tf.contrib.layers.conv2d(in_layer,out_channels,[kernel_size,1],[1,1])
         if maxpool:
             return tf.nn.max_pool(relu,[1,2,1,1],[1,2,1,1],"VALID")
         return relu
@@ -194,10 +201,10 @@ def tom_oned(features,keep_prob,num_final_neurons):
             dropout = tf.nn.dropout(relu,keep_prob)
             return dropout
 
-    c1 = make_conv(f,8)
-    c2 = make_conv(c1,64,maxpool=True)
-    c3 = make_conv(c2,128)
-    c4 = make_conv(c3,256)
+    c1 = make_conv(f,64,9)
+    c2 = make_conv(c1,128,9,maxpool=True)
+    c3 = make_conv(c2,256,9)
+    c4 = make_conv(c3,256,maxpool=True)
     c5 = make_conv(c4,256,maxpool=True)
     c6 = make_conv(c5,512,maxpool=True)
     c7 = make_conv(c6,512,maxpool=True)
