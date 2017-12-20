@@ -39,6 +39,8 @@ silence_percentage = 10.0 # what percent of training data should be silence
 unknown_percentage = 10.0 # what percent of training data should be unknown words
 true_unknown_percentage = 10.0 # what percent of words should be complete goobledyguk
 
+np.random.seed(0)
+tf.set_random_seed(0)
 
 sess = tf.InteractiveSession()
 
@@ -169,16 +171,20 @@ labels_ph = tf.placeholder(tf.int32,(None))
 wav_ph = tf.placeholder(tf.float32,(None,sample_rate))
 keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
+is_training_ph = tf.placeholder(tf.bool)
 
 features = make_features(wav_ph,"identity")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = oned_conv(features,keep_prob,output_neurons)
+final_layer = oned_conv(features,keep_prob,output_neurons,is_training_ph)
 
 loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
 
-train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(loss_mean)
+update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+with tf.control_dependencies(update_ops):
+    train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(loss_mean)
+
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
 confusion_matrix = tf.confusion_matrix(labels_ph,predictions,num_classes=output_neurons)
@@ -190,8 +196,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_1dconv",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_1dconv",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_vggtest",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_vggtest",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -200,7 +206,7 @@ saver = tf.train.Saver()
 last_val_accuracy = 0
 for i in range(steps):
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
-    feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate})
+    feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate,is_training_ph: True})
     # now here's where we run the real, convnet part
     if i % 10 == 0:
         sum_val,acc_val,loss_val, _ = sess.run([merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
@@ -218,7 +224,7 @@ for i in range(steps):
         val_conf_mat = np.zeros((output_neurons,output_neurons))
         while val_offset < val_size:
             feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
-            feed_dict.update({keep_prob:1.0})
+            feed_dict.update({keep_prob:1.0,is_training_ph:False})
             val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([merged_summaries,accuracy_tensor,loss_mean,confusion_matrix],feed_dict)
             val_writer.add_summary(val_sum_val,i)
             val_acc.add(val_acc_val)
@@ -245,7 +251,7 @@ offset = 0
 test_batch_size = 100
 while offset < len(test_index):
     feed_dict = get_batch(test_index,test_batch_size,offset=offset,mode="comp",style=style)
-    feed_dict.update({ keep_prob:1.0})
+    feed_dict.update({ keep_prob:1.0,is_training_ph:False})
     test_pred = sess.run(predictions,feed_dict=feed_dict)
     test_labels = [all_words[test_index] for test_index in test_pred]
     for i in range(len(test_labels)):
