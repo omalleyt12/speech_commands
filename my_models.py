@@ -168,11 +168,13 @@ def drive_conv(features,keep_prob,num_final_neurons):
 
     dropout_conv = tf.nn.dropout(conv_out,keep_prob)
 
-    fc1 = tf.contrib.layers.fully_connected(dropout_conv,1000)
-
+    fc1 = tf.contrib.layers.fully_connected(dropout_conv,3000)
     dropout_fc1 = tf.nn.dropout(fc1,keep_prob)
 
-    final_layer = tf.contrib.layers.fully_connected(dropout_fc1,num_final_neurons)
+    fc2 = tf.contrib.layers.fully_connected(dropout_fc1,1500)
+    dropout_fc2 = tf.nn.dropout(fc2,keep_prob)
+
+    final_layer = tf.contrib.layers.fully_connected(dropout_fc2,num_final_neurons)
 
     return final_layer
 

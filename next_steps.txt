@@ -1,0 +1,9 @@
+Next Steps:
+
+Dang, Drive Conv only scored a .79 ...but I like that at least it gives high validation AND training scores
+
+1) Add another FC layer at the end of Drive Conv
+
+2) Beef up the sizes of these FC layers a few times
+
+3) Go back to the 1d conv and do more convs in the first place to get to the "MFCCish" features, don't just do 70-stride dropout lol
