@@ -20,25 +20,23 @@ def get_word(wav,percent_wav=0.5,indices=False):
     else:
         return max_chunk_start*chunk_samples, (max_chunk_start + keep_chunks)*chunk_samples
 
-def pad(wav):
-    start_word, end_word = get_word(wav,0.8,indices=True)
-    print(start_word)
-    print(end_word)
-    padding = np.random.randint(-start_word,sample_rate - end_word)
-    if padding > 0:
-        b = np.pad(wav,(padding,0),mode="constant")[:-padding]
-    else:
-        b = np.pad(wav,(0,-padding),mode="constant")[-padding:]
-    return b
-
-# def pad(d):
-#     max_pad = 100
-#     pad_num = np.random.randint(-max_pad,max_pad)
-#     if pad_num > 0:
-#         b = np.pad(d,(pad_num,0),mode="constant")[:-pad_num]
+# def pad(wav):
+#     start_word, end_word = get_word(wav,0.8,indices=True)
+#     padding = np.random.randint(-start_word,sample_rate - end_word)
+#     if padding > 0:
+#         b = np.pad(wav,(padding,0),mode="constant")[:-padding]
 #     else:
-#         b = np.pad(d,(0,-pad_num),mode="constant")[-pad_num:]
+#         b = np.pad(wav,(0,-padding),mode="constant")[-padding:]
 #     return b
+
+def pad(d):
+    max_pad = 100
+    pad_num = np.random.randint(-max_pad,max_pad)
+    if pad_num > 0:
+        b = np.pad(d,(pad_num,0),mode="constant")[:-pad_num]
+    else:
+        b = np.pad(d,(0,-pad_num),mode="constant")[-pad_num:]
+    return b
 
 def add_noise(d,bg_data):
     background_frequency = 0.8
