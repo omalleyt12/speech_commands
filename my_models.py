@@ -145,15 +145,43 @@ def drive_conv(features,keep_prob,num_final_neurons):
 
     c1 = tf.contrib.layers.conv2d(fingerprint_4d,64,[3,3],[1,1])
     c2 = tf.contrib.layers.conv2d(c1,128,[1,3],[1,1])
-    mp1 = tf.nn.max_pool(c2,[1,1,2,1],[1,1,2,1],"VALID")
+    mp1 = tf.nn.max_pool(c2,[1,1,2,1],[1,1,2,1],"SAME")
     c3 = tf.contrib.layers.conv2d(mp1,256,[1,5],[1,1])
-    mp2 = tf.nn.max_pool(c3,[1,1,2,1],[1,1,2,1],"VALID")
+    mp2 = tf.nn.max_pool(c3,[1,1,2,1],[1,1,2,1],"SAME")
 
-    # blah blah additional conving and pooling
+    c4 = tf.contrib.layers.conv2d(mp2,512,[1,10],[1,1],"VALID")
 
-    # at this point I have 5 MFCC features as the width, 256 conv channels, and 30 time features as height
-    # my strategy will be to use VALID padding and 1d conv'ing first to get dimensionality reduction on the MFCC channels
-    mfcc_combiner = tf.contrib.layers.conv2d(middle,512,[1,5],[1,1],"VALID")
+    c5 = tf.contrib.layers.conv2d(c4,512,[3,1],[1,1],"VALID")
+    c6 = tf.contrib.layers.conv2d(c5,256,[1,1],[1,1])
+    mp3 = tf.nn.max_pool(c6,[1,3,1,1],[1,3,1,1],"SAME")
+    print(mp3.shape)
+
+    c7_3 = tf.contrib.layers.conv2d(mp3,128,[3,1],[1,1],"VALID")
+    c7_5 = tf.contrib.layers.conv2d(mp3,128,[5,1],[1,1],"VALID")
+    c7_10 = tf.contrib.layers.conv2d(mp3,128,[10,1],[1,1],"VALID")
+
+    conv_out = tf.concat([
+        tf.contrib.layers.flatten(c7_3),
+        tf.contrib.layers.flatten(c7_5),
+        tf.contrib.layers.flatten(c7_10)
+    ],axis=1)
+
+    dropout_conv = tf.nn.dropout(conv_out,keep_prob)
+
+    fc1 = tf.contrib.layers.fully_connected(dropout_conv,1000)
+
+    dropout_fc1 = tf.nn.dropout(fc1,keep_prob)
+
+    final_layer = tf.contrib.layers.fully_connected(dropout_fc1,num_final_neurons)
+
+    return final_layer
+
+
+
+
+
+
+
 
 
 
