@@ -140,6 +140,25 @@ def vggnet(features,keep_prob,num_final_neurons):
 
     return final_layer
 
+def drive_conv(features,keep_prob,num_final_neurons):
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+    c1 = tf.contrib.layers.conv2d(fingerprint_4d,64,[3,3],[1,1])
+    c2 = tf.contrib.layers.conv2d(c1,128,[1,3],[1,1])
+    mp1 = tf.nn.max_pool(c2,[1,1,2,1],[1,1,2,1],"VALID")
+    c3 = tf.contrib.layers.conv2d(mp1,256,[1,5],[1,1])
+    mp2 = tf.nn.max_pool(c3,[1,1,2,1],[1,1,2,1],"VALID")
+    c4 = tf.contrib.layers()
+
+    # blah blah additional conving and pooling
+
+    # at this point I have 5 MFCC features as the width, 256 conv channels, and 30 time features as height
+    # my strategy will be to use VALID padding and 1d conv'ing first to get dimensionality reduction on the MFCC channels
+    mfcc_combiner = tf.contrib.layers.conv2d(middle,512,[1,5],[1,1],"VALID")
+
+
+
+
 # def inception(features,keep_prob,num_final_neurons):
 #     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 

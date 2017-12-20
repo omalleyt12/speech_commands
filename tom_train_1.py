@@ -24,7 +24,7 @@ from running_average import RunningAverage
 def play(a):
     import winsound
     print(a.shape)
-    sciwav.write("testing.wav",a.shape[0],a)
+    sciwav.write("testing.wav",16000,a)
     winsound.PlaySound("testing.wav",winsound.SND_FILENAME)
 
 style = "unknown"
