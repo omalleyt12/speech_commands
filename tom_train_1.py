@@ -137,7 +137,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
             rand_unknown = np.random.randint(0,len(unknown_index[mode]))
             u_rec = unknown_index[mode][rand_unknown]["data"]
             u_rec = pp.pad(u_rec)
-            u_rec = pp.add_noise(u_rec)
+            u_rec = pp.add_noise(u_rec,bg_data)
             recs.append(u_rec)
             labels.append(1)
 
