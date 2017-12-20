@@ -21,7 +21,6 @@ def pad(wav):
     pad_total = sample_rate - w.shape[0]
     left_pad = np.random.randint(0,pad_total)
     right_pad = pad_total - left_pad
-    print(left_pad)
     return np.pad(w,(left_pad,right_pad),mode="constant")
 
 # def pad(d):
