@@ -148,7 +148,6 @@ def drive_conv(features,keep_prob,num_final_neurons):
     mp1 = tf.nn.max_pool(c2,[1,1,2,1],[1,1,2,1],"VALID")
     c3 = tf.contrib.layers.conv2d(mp1,256,[1,5],[1,1])
     mp2 = tf.nn.max_pool(c3,[1,1,2,1],[1,1,2,1],"VALID")
-    c4 = tf.contrib.layers()
 
     # blah blah additional conving and pooling
 
@@ -163,6 +162,36 @@ def drive_conv(features,keep_prob,num_final_neurons):
 #     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
 #     def make_inception(in_layer):
+
+def tom1d(features,keep_prob,num_final_neurons):
+    f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
+    c1 = tf.contrib.layers.conv2d(f,128,[70,1],[1,1],"VALID")
+    m1 = tf.nn.max_pool(c1,[1,70,1,1],[1,70,1,1],"VALID")
+    c2 = tf.contrib.layers.conv2d(m1,256,[10,1],[1,1],"VALID")
+    m2 = tf.nn.max_pool(c2,[1,10,1,1],[1,10,1,1],"VALID")
+
+    c3_3 = tf.contrib.layers.conv2d(m2,128,[3,1],[1,1],"VALID")
+    c3_5 = tf.contrib.layers.conv2d(m2,128,[5,1],[1,1],"VALID")
+    c3_10 = tf.contrib.layers.conv2d(m2,128,[10,1],[1,1],"VALID")
+
+    conv_out = tf.concat([
+        tf.contrib.layers.flatten(c3_3),
+        tf.contrib.layers.flatten(c3_5),
+        tf.contrib.layers.flatten(c3_10)
+    ],axis=1)
+
+    dropout_conv = tf.nn.dropout(conv_out,keep_prob)
+
+    fc1 = tf.contrib.layers.fully_connected(dropout_conv,1000)
+
+    dropout_fc1 = tf.nn.dropout(fc1,keep_prob)
+
+    final_layer = tf.contrib.layers.fully_connected(dropout_fc1,num_final_neurons)
+
+    return final_layer
+
+
+
 
 
 
