@@ -16,22 +16,21 @@ def get_word(wav,percent_wav=0.5):
     max_chunk_start = np.argmax(rolling_avg_db)
     return np.concatenate(chunks[max_chunk_start:max_chunk_start+keep_chunks])
 
-def pad(wav):
-    w = get_word(wav,0.6)
-    pad_total = sample_rate - w.shape[0]
-    left_pad = np.random.randint(0,pad_total)
-    right_pad = pad_total - left_pad
-    return np.pad(w,(left_pad,right_pad),mode="constant")
+# def pad(wav):
+#     w = get_word(wav,0.6)
+#     pad_total = sample_rate - w.shape[0]
+#     left_pad = np.random.randint(0,pad_total)
+#     right_pad = pad_total - left_pad
+#     return np.pad(w,(left_pad,right_pad),mode="constant")
 
-# def pad(d):
-#     max_pad = 100
-#     pad_num = np.random.randint(-max_pad,max_pad)
-#     print(pad_num)
-#     if pad_num > 0:
-#         b = np.pad(d,(pad_num,0),mode="constant")[:-pad_num]
-#     else:
-#         b = np.pad(d,(0,-pad_num),mode="constant")[-pad_num:]
-#     return d
+def pad(d):
+    max_pad = 100
+    pad_num = np.random.randint(-max_pad,max_pad)
+    if pad_num > 0:
+        b = np.pad(d,(pad_num,0),mode="constant")[:-pad_num]
+    else:
+        b = np.pad(d,(0,-pad_num),mode="constant")[-pad_num:]
+    return d
 
 def add_noise(d,bg_data):
     background_frequency = 0.8
