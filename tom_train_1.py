@@ -23,6 +23,7 @@ from running_average import RunningAverage
 
 def play(a):
     import winsound
+    import scipy.io.wavfile as sciwav
     print(a.shape)
     sciwav.write("testing.wav",16000,a)
     winsound.PlaySound("testing.wav",winsound.SND_FILENAME)
@@ -131,31 +132,14 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
             recs.append(silence_rec)
             labels.append(all_words_index["silence"])
 
-        if style == "full":
-            true_unknown_recs = int(batch_size * true_unknown_percentage / 100)
-            for j in range(true_unknown_recs):
-                speaker_words = 0
-                rand_speaker = np.random.randint(0,len(unknown_speakers[mode]))
-                speaker_words = unknown_speakers[mode][rand_speaker][1]
-                choose_words = np.random.choice(len(speaker_words),2)
-                tu_word1 = speaker_words[choose_words[0]]["data"]
-                tu_word2 = speaker_words[choose_words[1]]["data"]
-                scrambler_decider = np.random.uniform()
-                if scrambler_decider < 0.2:
-                     tu_rec = pp.reverse(tu_word1)
-                elif scrambler_decider < 0.7:
-                     tu_rec = pp.combine(tu_word1,tu_word2)
-                else:
-                     tu_rec = pp.add(tu_word1,tu_word2)
-                recs.append(tu_rec)
-                labels.append(len(all_words) -1) # this "true_unknown"
-        else:
-            unknown_recs = int(batch_size * unknown_percentage / 100)
-            for j in range(unknown_recs):
-                rand_unknown = np.random.randint(0,len(unknown_index[mode]))
-                u_rec = unknown_index[mode][rand_unknown]["data"]
-                recs.append(u_rec)
-                labels.append(1)
+        unknown_recs = int(batch_size * unknown_percentage / 100)
+        for j in range(unknown_recs):
+            rand_unknown = np.random.randint(0,len(unknown_index[mode]))
+            u_rec = unknown_index[mode][rand_unknown]["data"]
+            u_rec = pp.pad(u_rec)
+            u_rec = pp.add_noise(u_rec)
+            recs.append(u_rec)
+            labels.append(1)
 
     feed_dict={ wav_ph: np.stack(recs)}
     if mode != "comp":
