@@ -249,3 +249,19 @@ while offset < len(test_index):
 df.to_csv("my_guesses_3.csv",index=False)
 
 sess.close()
+
+from twilio.rest import Client
+
+# Your Account SID from twilio.com/console
+account_sid = "AC7ef9b2470e5800d2cf47640564e18f3f"
+# Your Auth Token from twilio.com/console
+auth_token  = "e36bb44f5528a0bcbe45509b113d9469"
+
+client = Client(account_sid, auth_token)
+message = client.messages.create(
+    to="+19082682005",
+    from_="+12673607895",
+    body="Model finished running with {} validation accuracy".format(val_acc))
+
+print(message.sid)
+
