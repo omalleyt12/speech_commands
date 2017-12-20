@@ -4,14 +4,35 @@ from toolz.functoolz import memoize
 
 sample_rate = 16000
 
-def pad(d):
-    max_pad = 100
-    pad_num = np.random.randint(-max_pad,max_pad)
-    if pad_num > 0:
-        b = np.pad(d,(pad_num,0),mode="constant")[:-pad_num]
-    else:
-        b = np.pad(d,(0,-pad_num),mode="constant")[-pad_num:]
-    return d
+def wanted_word(w):
+    add_noise(pad(w))
+
+def get_word(wav,percent_wav=0.5):
+    chunk_size = 50
+    keep_chunks = int(chunk_size*percent_wav)
+    chunks = np.array_split(wav,50)
+    dbs = [20*np.log10( np.sqrt(np.mean(chunk**2)) ) for chunk in chunks]
+    rolling_avg_db = np.array([np.mean(dbs[i:i+keep_chunks]) for i in range(0,chunk_size - keep_chunks + 1)])
+    max_chunk_start = np.argmax(rolling_avg_db)
+    return np.concatenate(chunks[max_chunk_start:max_chunk_start+keep_chunks])
+
+def pad(wav):
+    w = get_word(wav,0.6)
+    pad_total = sample_rate - w.shape[0]
+    left_pad = np.random.randint(0,pad_total)
+    right_pad = pad_total - left_pad
+    print(left_pad)
+    return np.pad(w,(left_pad,right_pad),mode="constant")
+
+# def pad(d):
+#     max_pad = 100
+#     pad_num = np.random.randint(-max_pad,max_pad)
+#     print(pad_num)
+#     if pad_num > 0:
+#         b = np.pad(d,(pad_num,0),mode="constant")[:-pad_num]
+#     else:
+#         b = np.pad(d,(0,-pad_num),mode="constant")[-pad_num:]
+#     return d
 
 def add_noise(d,bg_data):
     background_frequency = 0.8
@@ -39,14 +60,19 @@ def get_sigmoid_blender(num):
 
 def combine(d1,d2):
     sb = get_sigmoid_blender(d1.shape[0])
-    return d1*sb + d2*(1 - sb)
+    d1 = np.pad(get_word(d1,0.5),(0,8000),mode="constant")
+    d2 = np.pad(get_word(d2,0.5),(8000,0),mode="constant")
+    return (d2*sb + d1*(1 - sb)).astype(np.float32)
 
 def resample(a,samples=16000):
-    resampler = interp1d(np.arange(a.shape[0]),a,kind='linear')
+    resampler = sp.interpolate.interp1d(np.arange(a.shape[0]),a,kind='linear')
     return resampler((np.linspace(0,a.shape[0]-1,samples,endpoint=False))).astype(np.float32)
 
-def speedx(a):
-    speed = np.random.uniform(0.85,1.15)
+def speedx(a,f=None):
+    if f is None:
+        speed = np.random.uniform(0.85,1.15)
+    else:
+        speed = f
     samples = int(sample_rate / speed)
     a = resample(a,samples)
     sample_diff = abs(samples - sample_rate)
