@@ -220,6 +220,88 @@ def tom1d(features,keep_prob,num_final_neurons):
 
     return final_layer
 
+def tom1d2(features,keep_prob,num_final_neurons):
+    f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
+
+    # s_ prefix will stand for spectrogramish 
+    # s_c1 = tf.contrib.layers.conv2d(f,64,[30,1],[1,1])
+    # s_c2 = tf.contrib.layers.conv2d(s_c1,128,[30,1],[1,1])
+    # s_c3 = tf.contrib.layers.conv2d(s_c2,256,[30,1],[1,1])
+    # s_c4 = tf.contrib.layers.conv2d(s_c3,256,[1,1],[1,1])
+
+    s_c1 = tf.contrib.layers.conv2d(f,256,[70,1],[1,1])
+    s_c2 = tf.contrib.layers.conv2d(s_c1,512,[1,1],[1,1])
+    s_c3 = tf.contrib.layers.conv2d(s_c2,256,[1,1],[1,1])
+
+    print(s_c3.shape)
+
+    # at this point we have 300Hz type stuff, but it's overlapping at every one of the 16000 points
+    # so we need to pick out only the points that matter
+
+    # s_mp1 = tf.nn.max_pool(s_c4,[1,8,1,1],[1,8,1,1],"VALID")
+    # s_tc2 = tf.contrib.layers.conv2d(s_mp1,256,[8,1],[1,1])
+    # s_mp2 = tf.nn.max_pool(s_tc2,[1,8,1,1],[1,8,1,1],"VALID")
+
+    s_mp1 = tf.nn.max_pool(s_c3,[1,70,1,1],[1,70,1,1],"VALID")
+
+    print(s_mp1.shape)
+
+    # at this point we've captured things in the 300Hz range and above, and should only have 1 feature per 300Hz wave
+
+    # s_tc3 = tf.contrib.layers.conv2d(s_mp2,512,[8,1],[1,1])
+    # s_ap1 = tf.nn.avg_pool(s_tc3,[1,8,1,1],[1,4,1,1],"VALID")
+    # s_tc4 = tf.contrib.layers.conv2d(s_ap1,512,[3,1],[1,1],"VALID")
+    # s_mp3 = tf.nn.max_pool(s_tc4,[1,2,1,1],[1,2,1,1],"VALID")
+    # s_tc5 = tf.contrib.layers.conv2d(s_mp3,256,[1,1],[1,1])
+
+    t_c1 = tf.contrib.layers.conv2d(s_mp1,512,[10,1],[1,1])
+    t_c2 = tf.contrib.layers.conv2d(t_c1,256,[1,1],[1,1])
+    t_ap1 = tf.nn.avg_pool(t_c2,[1,10,1,1],[1,5,1,1],"VALID")
+    t_mp1 = tf.nn.max_pool(t_ap1,[1,2,1,1],[1,2,1,1],"VALID")
+    t_c3 = tf.contrib.layers.conv2d(t_mp1,128,[1,1],[1,1])
+
+    print(t_c3.shape)
+
+    # at this point we have phoneme features
+
+    p_c1_5 = tf.contrib.layers.conv2d(t_c3,256,[5,1],[1,1],"VALID")
+    p_c1_10 = tf.contrib.layers.conv2d(t_c3,256,[10,1],[1,1],"VALID")
+
+    conv_out = tf.concat([
+        tf.contrib.layers.flatten(p_c1_5),
+        tf.contrib.layers.flatten(p_c1_10)
+    ],axis=1)
+
+    print(conv_out.shape)
+
+    # now we should have features that are strings of phonemes
+
+    dropout_conv = tf.nn.dropout(conv_out,keep_prob)
+
+    fc1 = tf.contrib.layers.fully_connected(dropout_conv,3000)
+    dropout_fc1 = tf.nn.dropout(fc1,keep_prob)
+
+    fc2 = tf.contrib.layers.fully_connected(dropout_fc1,1500)
+    dropout_fc2 = tf.nn.dropout(fc2,keep_prob)
+
+    final_layer = tf.contrib.layers.fully_connected(dropout_fc2,num_final_neurons)
+
+    return final_layer
+
+
+
+
+
+
+
+
+
+    print(s_mp3.shape)
+
+
+    
+
+
 
 
 
