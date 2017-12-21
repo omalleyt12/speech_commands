@@ -1,4 +1,5 @@
 import tensorflow as tf
+from keras.layers import GlobalMaxPool2D
 
 def orig_conv(features,keep_prob,num_final_neurons):
     """The original model by the Google guy, works for a 2d speech image feature (MFCC or Log Mel)"""
@@ -174,7 +175,7 @@ def drive_conv(features,keep_prob,num_final_neurons):
     fc2 = tf.contrib.layers.fully_connected(dropout_fc1,1500)
     dropout_fc2 = tf.nn.dropout(fc2,keep_prob)
 
-    final_layer = tf.contrib.layers.fully_connected(dropout_fc2,num_final_neurons)
+    final_layer = tf.contrib.layers.fully_connected(dropout_fc2,num_final_neurons,activation_fn=None)
 
     return final_layer
 
@@ -221,37 +222,25 @@ def tom1d(features,keep_prob,num_final_neurons):
     return final_layer
 
 def tom1d2(features,keep_prob,num_final_neurons):
+    """This got a .75 LB score"""
     f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
 
-    s_c1 = tf.contrib.layers.conv2d(f,128,[64,1],[1,1])
-    s_c2 = tf.contrib.layers.conv2d(s_c1,128,[1,1],[1,1])
-    s_c3 = tf.contrib.layers.conv2d(s_c2,64,[1,1],[1,1])
+    c = f
+    for channels in [9,27,81,243]:
+        c = tf.contrib.layers.conv2d(c,channels,[3,1],[3,1],"VALID")
 
-    mp = s_c3
-    for channels in [128,128,256,256,512,512]:
-        c = tf.contrib.layers.conv2d(mp,channels,[3,1],[1,1])
-        mp = tf.nn.max_pool(c,[1,2,1,1],[1,2,1,1],"SAME")
 
-    print(mp.shape)
+    print(c.shape)
 
-    t_c1 = tf.contrib.layers.conv2d(mp,256,[1,1],[1,1])
-
-    mp = t_c1
-    for channels in [256,512,512]:
-        c = tf.contrib.layers.conv2d(mp,channels,[3,1],[1,1])
-        mp = tf.nn.max_pool(c,[1,2,2,1],[1,2,2,1],"SAME")
+    c = tf.contrib.layers.conv2d(c,512,[5,1],[1,1],"VALID")
+    mp = tf.nn.max_pool(c,[1,5,1,1],[1,5,1,1],"VALID")
 
     print(mp.shape)
 
-    c3_3 = tf.contrib.layers.conv2d(mp,128,[3,1],[1,1],"VALID")
-    c3_5 = tf.contrib.layers.conv2d(mp,128,[5,1],[1,1],"VALID")
-    c3_10 = tf.contrib.layers.conv2d(mp,128,[10,1],[1,1],"VALID")
+    c3_3 = tf.contrib.layers.conv2d(mp,512,[3,1],[1,1],"VALID")
+    c3_10 = tf.contrib.layers.conv2d(c3_3,512,[10,1],[1,1],"VALID")
 
-    conv_out = tf.concat([
-        tf.contrib.layers.flatten(c3_3),
-        tf.contrib.layers.flatten(c3_5),
-        tf.contrib.layers.flatten(c3_10)
-    ],axis=1)
+    conv_out = GlobalMaxPool2D()(c3_10)
 
     print(conv_out.shape)
 
@@ -268,6 +257,22 @@ def tom1d2(features,keep_prob,num_final_neurons):
     final_layer = tf.contrib.layers.fully_connected(dropout_fc2,num_final_neurons)
 
     return final_layer
+
+def ttagau_conv(features,keep_prob,num_final_neurons):
+    from keras.layers import Conv1D, BatchNormalization, Activation, MaxPooling1D
+
+    for i in range(6): 
+        x = Conv1D(8*(2 ** i), (3),padding = 'same')(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+        x = MaxPooling1D((2), padding='same')(x)
+
+    x_1d_branch_1 = GlobalAveragePooling1D()(x)
+    x_1d_branch_2 = GlobalMaxPool1D()(x_1d)
+    x_1d = concatenate([x_1d_branch_1, x_1d_branch_2])
+    x_1d = Dense(1024, activation = 'relu', name= 'dense1024')(x_1d)
+
+
 
 
 
