@@ -7,7 +7,6 @@ sample_rate = 16000
 def wanted_word(w,bg_data):
     w = pad(w)
     w = pitch_shift(w)
-    w = speedx(w)
     w = add_noise(w,bg_data)
     return w
 
@@ -29,7 +28,6 @@ def unknown_word(w,speakers,bg_data):
         w = wraparound(w)
     w = pad(w)
     w = pitch_shift(w)
-    w = speedx(w)
     w = add_noise(w,bg_data)
     return w
 
@@ -123,7 +121,7 @@ def wraparound(a):
     return np.append(a[cut:],a[:cut])
 
 def pitch_shift(a):
-    if np.random.uniform(0,1) > 0.5:
+    if np.random.uniform(0,1) < 0.2:
         pitch = np.random.uniform(-2,2)
     else:
         return a
