@@ -64,9 +64,11 @@ def load_train_data(style="full"):
         d = {"file":wav_path,"data":wav_loader.load(wav_path,sess)}
         if style == "full" or word in wanted_words:
             d.update({"label":word,"label_index":all_words_index[word]})
+            d.update({"word":word})
             data_index[set_name].append(d)
         else:
             d.update({"label":"unknown","label_index":1})
+            d.update({"word":word})
         if word not in wanted_words: # this will be populated for both styles
             unknown_index[set_name].append(d)
 
@@ -76,30 +78,34 @@ def load_train_data(style="full"):
 
     return data_index, unknown_index
 
-def get_unknowns_by_speaker(unknown_index):
+def get_speakers(unknown_index,data_index):
     """Organize unknowns into speakers who have spoken two or more different words"""
     def unique_words(l):
         new_l = []
         should_add = True
         for ele in l:
             for new_ele in new_l:
-                if new_ele["label"] == ele["label"]:
+                if new_ele["word"] == ele["word"]:
                      should_add = False
             if should_add:
                 new_l.append(ele)
         return new_l
 
+    full_index = {}
+    for set_name in ["train","val","test"]:
+        full_index[set_name] = unknown_index[set_name] + data_index[set_name]
+
     from collections import defaultdict
-    unknown_speakers = {}
+    speakers = {}
     for set_name in ['val','test','train']:
-        unknown_speakers[set_name] = defaultdict(list)
-        for i,rec in enumerate(unknown_index[set_name]):
+        speakers[set_name] = defaultdict(list)
+        for i,rec in enumerate(full_index[set_name]):
             speaker = re.sub(r'_nohash_.*$','',os.path.basename(rec["file"]))
-            unknown_speakers[set_name][speaker].append(rec)
-        unknown_speakers[set_name] = unknown_speakers[set_name].items( )
-        unknown_speakers[set_name] = [(u[0],unique_words(u[1])) for u in unknown_speakers[set_name]]
-        unknown_speakers[set_name] = [u for u in unknown_speakers[set_name] if len(u[1]) > 2]
-    return unknown_speakers
+            speakers[set_name][speaker].append(rec)
+        speakers[set_name] = speakers[set_name].items( )
+        speakers[set_name] = [(u[0],unique_words(u[1])) for u in speakers[set_name]]
+        speakers[set_name] = [u for u in speakers[set_name] if len(u[1]) > 2]
+    return speakers
 
 wav_ph = tf.placeholder(tf.float32,[None,sample_rate])
 
@@ -118,8 +124,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         rec_data = rec["data"]
 
         if mode == "train":
-            rec_data = pp.pad(rec_data)
-            rec_data = pp.add_noise(rec_data,bg_data)
+            rec_data = pp.wanted_word(rec_data,bg_data)
 
         if mode != "comp":
             labels.append(rec["label_index"])
@@ -137,8 +142,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
             rand_unknown = np.random.randint(0,len(unknown_index[mode]))
             u_rec = unknown_index[mode][rand_unknown]["data"]
             if mode == "train":
-                u_rec = pp.pad(u_rec)
-                u_rec = pp.add_noise(u_rec,bg_data)
+                u_rec = pp.unknown_word(u_rec,speakers,bg_data)
             recs.append(u_rec)
             labels.append(1)
 
@@ -149,7 +153,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
 
 
 data_index, unknown_index = load_train_data(style=style)
-unknown_speakers = get_unknowns_by_speaker(unknown_index)
+speakers = get_speakers(unknown_index,data_index)
 bg_data = wl.load_bg_data(sess)
 
 labels_ph = tf.placeholder(tf.int32,(None))
