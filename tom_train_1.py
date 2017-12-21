@@ -29,7 +29,7 @@ def play(a):
     winsound.PlaySound("testing.wav",winsound.SND_FILENAME)
 
 style = "unknown"
-batch_size = 100
+batch_size = 50
 eval_step = 500
 steps = 200000
 learning_rate = 0.01
@@ -232,7 +232,7 @@ test_index = wl.load_test_data(sess)
 import pandas as pd
 df = pd.DataFrame([],columns=["fname","label"])
 offset = 0
-test_batch_size = 100
+test_batch_size = batch_size
 while offset < len(test_index):
     feed_dict = get_batch(test_index,test_batch_size,offset=offset,mode="comp",style=style)
     feed_dict.update({ keep_prob:1.0,is_training_ph:False})
