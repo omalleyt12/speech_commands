@@ -148,7 +148,7 @@ def drive_conv(features,keep_prob,num_final_neurons):
     mp1 = tf.nn.max_pool(c2,[1,1,2,1],[1,1,2,1],"SAME")
     c3 = tf.contrib.layers.conv2d(mp1,256,[1,5],[1,1])
     mp2 = tf.nn.max_pool(c3,[1,1,2,1],[1,1,2,1],"SAME")
-
+ 
     c4 = tf.contrib.layers.conv2d(mp2,512,[1,10],[1,1],"VALID")
 
     c5 = tf.contrib.layers.conv2d(c4,512,[3,1],[1,1],"VALID")
@@ -242,7 +242,9 @@ def tom1d2(features,keep_prob,num_final_neurons):
     # s_tc2 = tf.contrib.layers.conv2d(s_mp1,256,[8,1],[1,1])
     # s_mp2 = tf.nn.max_pool(s_tc2,[1,8,1,1],[1,8,1,1],"VALID")
 
-    s_mp1 = tf.nn.max_pool(s_c3,[1,70,1,1],[1,70,1,1],"VALID")
+    s_mp1 = tf.nn.max_pool(s_c3,[1,7,1,1],[1,7,1,1],"VALID")
+    s_sc1 = tf.contrib.layers.conv2d(s_mp1,256,[10,1],[1,1])
+    s_mp2 = tf.nn.max_pool(s_sc1,[1,10,1,1],[1,10,1,1],"VALID")
 
     print(s_mp1.shape)
 
@@ -254,7 +256,7 @@ def tom1d2(features,keep_prob,num_final_neurons):
     # s_mp3 = tf.nn.max_pool(s_tc4,[1,2,1,1],[1,2,1,1],"VALID")
     # s_tc5 = tf.contrib.layers.conv2d(s_mp3,256,[1,1],[1,1])
 
-    t_c1 = tf.contrib.layers.conv2d(s_mp1,512,[10,1],[1,1])
+    t_c1 = tf.contrib.layers.conv2d(s_mp2,512,[10,1],[1,1])
     t_c2 = tf.contrib.layers.conv2d(t_c1,256,[1,1],[1,1])
     t_ap1 = tf.nn.avg_pool(t_c2,[1,10,1,1],[1,5,1,1],"VALID")
     t_mp1 = tf.nn.max_pool(t_ap1,[1,2,1,1],[1,2,1,1],"VALID")
