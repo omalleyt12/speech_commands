@@ -4,8 +4,35 @@ from toolz.functoolz import memoize
 
 sample_rate = 16000
 
-def wanted_word(w):
-    add_noise(pad(w))
+def wanted_word(w,bg_data):
+    w = pad(w)
+    w = pitch_shift(w)
+    w = speedx(w)
+    w = add_noise(w,bg_data)
+    return w
+
+def unknown_word(w,speakers,bg_data):
+    distortion_picker = np.random.uniform(0,1)
+    if distortion_picker < 0.3:
+        speaker = np.random.randint(0,len(speakers["train"]))
+        words = speakers["train"][speaker][1]
+        chosen = np.random.choice(len(words),2)
+        word1 = words[chosen[0]]["data"]
+        word2 = words[chosen[1]]["data"]
+        if distortion_picker < 0.2:
+            w = combine(word1,word2)
+        else:
+            w = add(word1,word2)
+    elif distortion_picker < 0.4:
+        w = reverse(w)
+    elif distortion_picker < 0.5:
+        w = wraparound(w)
+    w = pad(w)
+    w = pitch_shift(w)
+    w = speedx(w)
+    w = add_noise(w,bg_data)
+    return w
+
 
 def get_word(wav,percent_wav=0.5,indices=False):
     chunk_size = 50
@@ -74,12 +101,16 @@ def resample(a,samples=16000):
 
 def speedx(a,f=None):
     if f is None:
-        speed = np.random.uniform(0.85,1.15)
+        speed_picker = np.random.uniform(0,1)
+        if speed_picker > 0.5:
+            speed = np.random.uniform(0.85,1.15)
+        else:
+            return a
     else:
         speed = f
     samples = int(sample_rate / speed)
     a = resample(a,samples)
-    sample_diff = abs(samples - sample_rate)
+    sample_diff = np.abs(samples - sample_rate)
     left_samples = np.random.randint(0,sample_diff)
     right_samples = sample_diff - left_samples
     if speed > 1:
@@ -89,10 +120,13 @@ def speedx(a,f=None):
 
 def wraparound(a):
     cut = np.random.randint(0,a.shape[0])
-    print(cut)
     return np.append(a[cut:],a[:cut])
 
-def pitch_shift(a,pitch):
+def pitch_shift(a):
+    if np.random.uniform(0,1) > 0.5:
+        pitch = np.random.uniform(-2,2)
+    else:
+        return a
     sampling_rate = 16000
     chunk = 300
     overlap = 0.75
