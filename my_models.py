@@ -233,7 +233,8 @@ def tom1d2(features,keep_prob,num_final_neurons):
 
     # waittt a second, now I have to do my 3x3 conv in the time x channels, so reshape this
 
-    c = tf.reshape(c,[-1,c.shape[1],80,1])
+    c = tf.squeeze(c,axis=2)
+    c = tf.reshape(c,[-1,c.shape[1],c.shape[2],1])
     print(c.shape)
 
     kernel_sizes = [(3,3),(3,3),(1,3),(1,3)]
