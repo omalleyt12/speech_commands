@@ -165,10 +165,10 @@ keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
 
-features = make_features(wav_ph,"mfcc")
+features = make_features(wav_ph,"identity")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = drive_conv(features,keep_prob,output_neurons)
+final_layer = tom1d2(features,keep_prob,output_neurons)
 
 loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
@@ -186,7 +186,7 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_driveconv1_volume_eq",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_tom1d_withchannels",sess.graph)
 val_writer = tf.summary.FileWriter("logs/val_unknown_driveconv1_volume_eq",sess.graph)
 
 
