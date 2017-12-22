@@ -183,7 +183,8 @@ def run_validation(set_name):
             pred_df_list.append({
                 "true_label":val_rec["label"],
                 "true_word":val_rec["word"],
-                "pred_label":all_words[val_p]
+                "pred_label":all_words[val_p],
+                "file":val_rec["file"]
             })
         pd.DataFrame(pred_df_list).to_csv("predictions_{}.csv".format(set_name))
 
