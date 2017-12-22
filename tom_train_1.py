@@ -32,7 +32,7 @@ style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 200000
-learning_rate = 0.01
+learning_rate = 0.0000001
 # decay_every = 2000
 decay_rate = 0.10
 sample_rate = 16000 # per sec
@@ -156,7 +156,6 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
 
 
 def run_validation(set_name):
-        set_name = "val" if not i == (steps - 1) else "test"
         val_size = len(data_index[set_name])
         val_offset = 0
         val_acc = RunningAverage()
