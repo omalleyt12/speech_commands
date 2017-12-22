@@ -6,7 +6,7 @@ sample_rate = 16000
 
 def wanted_word(w,bg_data):
     w = pad(w)
-    w = pitch_shift(w)
+    # w = pitch_shift(w)
     w = add_noise(w,bg_data)
     return w
 
@@ -27,7 +27,7 @@ def unknown_word(w,speakers,bg_data):
     elif distortion_picker < 0.5:
         w = wraparound(w)
     w = pad(w)
-    w = pitch_shift(w)
+    # w = pitch_shift(w)
     w = add_noise(w,bg_data)
     return w
 

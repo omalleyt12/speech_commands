@@ -215,10 +215,10 @@ keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
 
-features = make_features(wav_ph,"mfcc")
+features = make_features(wav_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = drive_conv(features,keep_prob,output_neurons)
+final_layer = drive_conv_log_mel(features,keep_prob,output_neurons)
 
 loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
@@ -236,8 +236,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_drive_conv_again",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_drive_conv_again",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_drive_conv_log_mel",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_drive_conv_log_mel",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
