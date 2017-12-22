@@ -161,7 +161,7 @@ def run_validation(set_name):
         val_acc = RunningAverage()
         val_loss = RunningAverage()
         val_conf_mat = np.zeros((output_neurons,output_neurons))
-        val_pred_list = []
+        pred_df_list = []
         while val_offset < val_size:
             feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
             feed_dict.update({keep_prob:1.0,is_training_ph:False})
@@ -171,20 +171,35 @@ def run_validation(set_name):
             val_loss.add(val_loss_val)
             val_conf_mat += val_conf_mat_val
             val_offset += batch_size
-            val_pred_list += list(val_pred)
+            val_pred_list = list(val_pred)
+            for val_rec,val_p in zip(data_index[set_name][val_offset:val_offset+batch_size],val_pred_list[:batch_size]):
+                pred_df_list.append({
+                    "true_label":val_rec["label"],
+                    "true_word":val_rec["word"],
+                    "pred_label":all_words[val_p],
+                    "file":val_rec["file"]
+                })
+            silence_end = batch_size + int(batch_size * silence_percentage / 100)
+            for val_p in val_pred_list[batch_size:silence_end]:
+                pred_df_list.append({
+                    "true_label":"silence",
+                    "true_word":"silence",
+                    "pred_label":all_words[val_p],
+                    "file":None
+                })
+            for val_p in val_pred_list[silence_end:]:
+                pred_df_list.append({
+                    "true_label":"unknown",
+                    "true_word":"unknown",
+                    "pred_label":all_words[val_p],
+                    "file":None
+                })
+
         tf.logging.info("{} Step {} Accuracy {} Loss {}".format(set_name,i,val_acc,val_loss))
         df_words = all_words if style == "full" else wanted_words
 
         pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(set_name))
 
-        pred_df_list = []
-        for val_rec, val_p in zip(data_index[set_name],val_pred_list):
-            pred_df_list.append({
-                "true_label":val_rec["label"],
-                "true_word":val_rec["word"],
-                "pred_label":all_words[val_p],
-                "file":val_rec["file"]
-            })
         pd.DataFrame(pred_df_list).to_csv("predictions_{}.csv".format(set_name))
 
         return val_acc.calculate()
