@@ -249,6 +249,7 @@ for i in range(steps):
 
     if learning_rate < 0.00001: # at this point, just stop
         test_acc = run_validation("test")
+        train_acc = run_validation("train")
         break
 
 test_index = wl.load_test_data(sess)
