@@ -155,6 +155,41 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
     return feed_dict
 
 
+def run_validation(set_name):
+        set_name = "val" if not i == (steps - 1) else "test"
+        val_size = len(data_index[set_name])
+        val_offset = 0
+        val_acc = RunningAverage()
+        val_loss = RunningAverage()
+        val_conf_mat = np.zeros((output_neurons,output_neurons))
+        val_pred_list = []
+        while val_offset < val_size:
+            feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
+            feed_dict.update({keep_prob:1.0,is_training_ph:False})
+            val_pred,val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([predictions,merged_summaries,accuracy_tensor,loss_mean,confusion_matrix],feed_dict)
+            val_writer.add_summary(val_sum_val,i)
+            val_acc.add(val_acc_val)
+            val_loss.add(val_loss_val)
+            val_conf_mat += val_conf_mat_val
+            val_offset += batch_size
+            val_pred_list += list(val_pred)
+        tf.logging.info("{} Step {} Accuracy {} Loss {}".format(set_name,i,val_acc,val_loss))
+        df_words = all_words if style == "full" else wanted_words
+
+        pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(set_name))
+
+        pred_df_list = []
+        for val_rec, val_p in zip(data_index[set_name],val_pred_list):
+            pred_df_list.append({
+                "true_label":val_rec["label"],
+                "true_word":val_rec["word"],
+                "pred_label":all_words[val_p]
+            })
+        pd.DataFrame(pred_df_list).to_csv("predictions_{}.csv".format(set_name))
+
+        return val_acc.calculate()
+
+
 data_index, unknown_index = load_train_data(style=style)
 speakers = get_speakers(unknown_index,data_index)
 bg_data = wl.load_bg_data(sess)
@@ -206,32 +241,14 @@ for i in range(steps):
         sess.run(train_step,feed_dict)
 
     if i % eval_step == 0 or i == (steps - 1):
-        set_name = "val" if not i == (steps - 1) else "test"
-        val_size = len(data_index[set_name])
-        val_offset = 0
-        val_acc = RunningAverage()
-        val_loss = RunningAverage()
-        val_conf_mat = np.zeros((output_neurons,output_neurons))
-        while val_offset < val_size:
-            feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
-            feed_dict.update({keep_prob:1.0,is_training_ph:False})
-            val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([merged_summaries,accuracy_tensor,loss_mean,confusion_matrix],feed_dict)
-            val_writer.add_summary(val_sum_val,i)
-            val_acc.add(val_acc_val)
-            val_loss.add(val_loss_val)
-            val_conf_mat += val_conf_mat_val
-            val_offset += batch_size
-        tf.logging.info("{} Step {} Val Accuracy {} Loss {}".format(set_name,i,val_acc,val_loss))
-        df_words = all_words if style == "full" else wanted_words
-
-        pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix.csv")
-
-        if val_acc.calculate() < last_val_accuracy and i > 500:
+        val_acc = run_validation("val")
+        if val_acc < last_val_accuracy:
             learning_rate = decay_rate*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
-        last_val_accuracy = val_acc.calculate()
+        last_val_accuracy = val_acc
 
     if learning_rate < 0.00001: # at this point, just stop
+        test_acc = run_validation("test")
         break
 
 test_index = wl.load_test_data(sess)
