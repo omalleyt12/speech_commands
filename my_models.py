@@ -259,37 +259,32 @@ def tom1d2(features,keep_prob,num_final_neurons):
     return final_layer
 
 def ttagau_conv(features,keep_prob,num_final_neurons):
-    from keras.layers import Conv1D, BatchNormalization, Activation, MaxPooling1D
+    from keras.layers import Conv1D, BatchNormalization, Activation, MaxPooling1D, GlobalAveragePooling1D, GlobalMaxPool1D
 
-    for i in range(6): 
+    x = tf.reshape(features,[-1,features.shape[1],1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
+    for i in range(6):
         x = Conv1D(8*(2 ** i), (3),padding = 'same')(x)
         x = BatchNormalization()(x)
         x = Activation('relu')(x)
         x = MaxPooling1D((2), padding='same')(x)
 
     x_1d_branch_1 = GlobalAveragePooling1D()(x)
-    x_1d_branch_2 = GlobalMaxPool1D()(x_1d)
-    x_1d = concatenate([x_1d_branch_1, x_1d_branch_2])
-    x_1d = Dense(1024, activation = 'relu', name= 'dense1024')(x_1d)
+    x_1d_branch_2 = GlobalMaxPool1D()(x)
+    x_1d_branch_1 = tf.contrib.layers.flatten(x_1d_branch_1)
+    x_1d_branch_2 = tf.contrib.layers.flatten(x_1d_branch_2)
 
+    x_1d = tf.concat([x_1d_branch_1,x_1d_branch_2],axis=1)
 
+    print(x_1d.shape)
 
+    dropout_x_1d = tf.nn.dropout(x_1d,keep_prob)
 
+    fc1 = tf.contrib.layers.fully_connected(dropout_x_1d,1024)
 
+    print(fc1.shape)
+    dropout_fc1 = tf.nn.dropout(fc1,keep_prob)
 
-
-
-
-
-
-    print(s_mp3.shape)
-
-
-    
-
-
-
-
+    final_layer = tf.contrib.layers.fully_connected(dropout_fc1,keep_prob,activation_fn=None)
 
 
 
