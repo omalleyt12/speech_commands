@@ -223,40 +223,59 @@ def tom1d(features,keep_prob,num_final_neurons):
 
 def tom1d2(features,keep_prob,num_final_neurons):
     """This got a .75 LB score"""
+    from keras.layers import GlobalMaxPool2D
     f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
 
     c = f
-    for channels in [9,27,81,243]:
+    for channels in [8,16,32,64,128] :
         c = tf.contrib.layers.conv2d(c,channels,[3,1],[3,1],"VALID")
+    c = tf.contrib.layers.conv2d(c,256,[1,1],[1,1])
+    c = tf.contrib.layers.conv2d(c,80,[1,1],[1,1])
 
+    # waittt a second, now I have to do my 3x3 conv in the time x channels, so reshape this
 
-    print(c.shape)
+    c = tf.reshape(c,[-1,c.shape[1],80,1])
 
-    c = tf.contrib.layers.conv2d(c,512,[5,1],[1,1],"VALID")
-    mp = tf.nn.max_pool(c,[1,5,1,1],[1,5,1,1],"VALID")
+    kernel_sizes = [(3,3),(3,3),(3,1)]
+    channels = [64,128,256]
+    max_pool_size = [(1,2,2,1),(1,2,2,1),(1,1,2,1)]
+    mp = c
+    for kernel_size,channel_num,mp_size in zip(kernel_sizes,channels,max_pool_size):
+        tc = tf.contrib.layers.conv2d(mp,channel_num,kernel_size,[1,1])
+        mp = tf.nn.max_pool(tc,mp_size,mp_size,"VALID")
 
     print(mp.shape)
 
-    c3_3 = tf.contrib.layers.conv2d(mp,512,[3,1],[1,1],"VALID")
-    c3_10 = tf.contrib.layers.conv2d(c3_3,512,[10,1],[1,1],"VALID")
+    # c = tf.contrib.layers.conv2d(c,512,[3,1],[1,1])
+    # mp = tf.nn.max_pool(c,)
 
-    conv_out = GlobalMaxPool2D()(c3_10)
+    # print(c.shape)
 
-    print(conv_out.shape)
+    # c = tf.contrib.layers.conv2d(c,512,[5,1],[1,1],"VALID")
+    # mp = tf.nn.max_pool(c,[1,5,1,1],[1,5,1,1],"VALID")
 
-    # now we should have features that are strings of phonemes
+    # print(mp.shape)
 
-    dropout_conv = tf.nn.dropout(conv_out,keep_prob)
+    # c3_3 = tf.contrib.layers.conv2d(mp,512,[3,1],[1,1],"VALID")
+    # c3_10 = tf.contrib.layers.conv2d(c3_3,512,[10,1],[1,1],"VALID")
 
-    fc1 = tf.contrib.layers.fully_connected(dropout_conv,3000)
-    dropout_fc1 = tf.nn.dropout(fc1,keep_prob)
+    # conv_out = GlobalMaxPool2D()(c3_10)
 
-    fc2 = tf.contrib.layers.fully_connected(dropout_fc1,1500)
-    dropout_fc2 = tf.nn.dropout(fc2,keep_prob)
+    # print(conv_out.shape)
 
-    final_layer = tf.contrib.layers.fully_connected(dropout_fc2,num_final_neurons)
+    # # now we should have features that are strings of phonemes
 
-    return final_layer
+    # dropout_conv = tf.nn.dropout(conv_out,keep_prob)
+
+    # fc1 = tf.contrib.layers.fully_connected(dropout_conv,3000)
+    # dropout_fc1 = tf.nn.dropout(fc1,keep_prob)
+
+    # fc2 = tf.contrib.layers.fully_connected(dropout_fc1,1500)
+    # dropout_fc2 = tf.nn.dropout(fc2,keep_prob)
+
+    # final_layer = tf.contrib.layers.fully_connected(dropout_fc2,num_final_neurons)
+
+    # return final_layer
 
 def ttagau_conv(features,keep_prob,num_final_neurons):
     from keras.layers import Conv1D, BatchNormalization, Activation, MaxPooling1D, GlobalAveragePooling1D, GlobalMaxPool1D
