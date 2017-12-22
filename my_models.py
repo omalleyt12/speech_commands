@@ -115,6 +115,7 @@ def vggnet(features,keep_prob,num_final_neurons):
     # c7 = make_vgg_conv_layer(c6,512,512,name="layer_7")
     c_last = make_vgg_conv_layer(c4,512,512,name="layer_8",maxpool=True)
 
+    print(c_last.shape)
 
     # c1 = make_vgg_conv_layer(fingerprint_4d,1,64,name="layer_1",maxpool=True)
     # c2 = make_vgg_conv_layer(c1,64,128,name="layer_2",maxpool=True)
@@ -180,6 +181,49 @@ def drive_conv(features,keep_prob,num_final_neurons):
     return final_layer
 
 
+def drive_conv_log_mel(features,keep_prob,num_final_neurons):
+    """Let's assume we have a 128 bin spectrogram here"""
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+    c = tf.contrib.layers.conv2d(fingerprint_4d,64,[3,3],[1,1])
+    mp = tf.nn.max_pool(c,[1,2,2,1],[1,2,2,1],"VALID")
+    c = tf.contrib.layers.conv2d(mp,128,[3,3],[1,1])
+    mp = tf.nn.max_pool(c,[1,2,2,1],[1,2,2,1],"VALID")
+    c = tf.contrib.layers.conv2d(mp,128,[3,3],[1,1])
+    mp = tf.nn.max_pool(c,[1,1,2,1],[1,1,2,1],"VALID")
+
+    print(mp.shape)
+    for channels in [192,256,384,512]:
+        c = tf.contrib.layers.conv2d(mp,channels,[3,1],[1,1])
+        mp = tf.nn.max_pool(c,[1,1,2,1],[1,1,2,1],"VALID")
+    c = tf.contrib.layers.conv2d(mp,256,[1,1],[1,1])
+
+    print(c.shape)
+
+
+    c7_3 = tf.contrib.layers.conv2d(c,128,[3,1],[1,1],"VALID")
+    c7_5 = tf.contrib.layers.conv2d(c,128,[5,1],[1,1],"VALID")
+    c7_10 = tf.contrib.layers.conv2d(c,128,[10,1],[1,1],"VALID")
+
+    conv_out = tf.concat([
+        tf.contrib.layers.flatten(c7_3),
+        tf.contrib.layers.flatten(c7_5),
+        tf.contrib.layers.flatten(c7_10)
+    ],axis=1)
+
+    print(conv_out.shape)
+
+    dropout_conv = tf.nn.dropout(conv_out,keep_prob)
+
+    fc1 = tf.contrib.layers.fully_connected(dropout_conv,3000)
+    dropout_fc1 = tf.nn.dropout(fc1,keep_prob)
+
+    fc2 = tf.contrib.layers.fully_connected(dropout_fc1,1500)
+    dropout_fc2 = tf.nn.dropout(fc2,keep_prob)
+
+    final_layer = tf.contrib.layers.fully_connected(dropout_fc2,num_final_neurons,activation_fn=None)
+
+    return final_layer
 
 
 
