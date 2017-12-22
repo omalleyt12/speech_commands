@@ -125,6 +125,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
 
         if mode == "train":
             rec_data = pp.wanted_word(rec_data,bg_data)
+        rec_data = pp.volume_equalizer(rec_data)
 
         if mode != "comp":
             labels.append(rec["label_index"])
@@ -134,6 +135,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         silence_recs = int(batch_size * silence_percentage / 100)
         for j in range(silence_recs):
             silence_rec = pp.add_noise(np.zeros(sample_rate,dtype=np.float32),bg_data)
+            silence_rec = pp.volume_equalizer(silence_rec)
             recs.append(silence_rec)
             labels.append(all_words_index["silence"])
 
@@ -143,6 +145,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
             u_rec = unknown_index[mode][rand_unknown]["data"]
             if mode == "train":
                 u_rec = pp.unknown_word(u_rec,speakers,bg_data)
+            u_rec = pp.volume_equalizer(u_rec)
             recs.append(u_rec)
             labels.append(1)
 
@@ -183,8 +186,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_driveconv1_good_distortions",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_driveconv1_good_distortions",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_driveconv1_volume_eq",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_driveconv1_volume_eq",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
