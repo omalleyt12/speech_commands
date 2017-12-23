@@ -236,8 +236,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_drive_conv_log_mel",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_drive_conv_log_mel",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_drive_conv_linear_mel",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_drive_conv_linear_mel",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
