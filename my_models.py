@@ -180,7 +180,7 @@ def drive_conv(features,keep_prob,num_final_neurons):
 
     return final_layer
 
-
+# This is my best model yet, with LB of 0.86
 def drive_conv_log_mel(features,keep_prob,num_final_neurons):
     """Let's assume we have a 128 bin spectrogram here"""
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
@@ -225,7 +225,15 @@ def drive_conv_log_mel(features,keep_prob,num_final_neurons):
 
     return final_layer
 
+def conv2d_bn(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME"):
+    """Make sure to update training ops when using this, can run something like:
 
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    sess.run(...,update_ops)
+
+    Also make sure to use the is_training placeholder
+    """
+    return tf.contrib.layers.conv2d(x,channels,kernel_size,strides,normalizer_fn=tf.contrib.layers.batch_norm,normalizer_params={"is_training":is_training},padding=padding)
 
 
 
