@@ -260,11 +260,12 @@ for i in range(steps):
         if val_acc < last_val_accuracy + 0.003: # try to prevent overfitting to the validation set as well, allow earlier training stop
             learning_rate = decay_rate*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
-            saver.save(sess,"./model.ckpt")
             print("Restoring former model and rerunning validation")
+            saver.restore(sess,"./model.ckpt")
             val_acc = run_validation("val")
         else:
-            saver.restore(sess,"./model.ckpt")
+            saver.save(sess,"./model.ckpt")
+
         last_val_accuracy = val_acc
 
     if learning_rate < 0.00001: # at this point, just stop
