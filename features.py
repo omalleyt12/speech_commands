@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from toolz.functoolz import memoize
 from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
-import speech_commands.mel_matrix as mel_matrix
+import mel_matrix
 
 sample_rate = 16000
 window_size_samples = 30 * 16 # ms * samples/ms
