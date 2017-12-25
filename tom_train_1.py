@@ -236,8 +236,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_drive_conv_linear_mel",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_drive_conv_linear_mel",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_drive_conv_log_mel_val_restore",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_drive_conv_log_mel_val_restore",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -257,9 +257,14 @@ for i in range(steps):
 
     if i % eval_step == 0 or i == (steps - 1):
         val_acc = run_validation("val")
-        if val_acc < last_val_accuracy:
+        if val_acc < last_val_accuracy + 0.003: # try to prevent overfitting to the validation set as well, allow earlier training stop
             learning_rate = decay_rate*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
+            saver.save(sess,"./model.ckpt")
+            print("Restoring former model and rerunning validation")
+            val_acc = run_validation("val")
+        else:
+            saver.restore(sess,"./model.ckpt")
         last_val_accuracy = val_acc
 
     if learning_rate < 0.00001: # at this point, just stop

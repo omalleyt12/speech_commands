@@ -35,10 +35,9 @@ def make_log_mel_fb(sig,name=None):
         mel_spectrograms = tf.tensordot(magnitude_spectrograms, linear_to_mel_weight_matrix, 1)
         # Note: Shape inference for `tf.tensordot` does not currently handle this case.
         mel_spectrograms.set_shape(magnitude_spectrograms.shape[:-1].concatenate(linear_to_mel_weight_matrix.shape[-1:]))
-        # log_offset = 1e-6
-        # log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
-        # return log_mel_spectrograms
-        return mel_spectrograms
+        log_offset = 1e-6
+        log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
+        return log_mel_spectrograms
 
 def make_vtlp_mels(sig,is_training,name=None):
     """A limitation with this approach is that the VTLP factor is the same within a batch"""
