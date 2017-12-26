@@ -218,12 +218,12 @@ is_training_ph = tf.placeholder(tf.bool)
 features = make_features(wav_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = drive_conv_log_mel(features,keep_prob,output_neurons)
+final_layer = drive_conv_log_mel(features,keep_prob,output_neurons,is_training_ph)
 
 loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
 
-train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9,use_nesterov=True).minimize(loss_mean)
+train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(loss_mean)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
@@ -236,8 +236,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_drive_conv_log_mel_val_nesterov",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_drive_conv_log_mel_val_nesterov",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_drive_conv_log_mel_fixed",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_drive_conv_log_mel_val_fixed",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)

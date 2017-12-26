@@ -181,7 +181,7 @@ def drive_conv(features,keep_prob,num_final_neurons):
     return final_layer
 
 # This is my best model yet, with LB of 0.86
-def drive_conv_log_mel(features,keep_prob,num_final_neurons):
+def drive_conv_log_mel(features,keep_prob,num_final_neurons,is_training):
     """Let's assume we have a 128 bin spectrogram here"""
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
@@ -194,7 +194,7 @@ def drive_conv_log_mel(features,keep_prob,num_final_neurons):
 
     print(mp.shape)
     for channels in [192,256,384,512]:
-        c = tf.contrib.layers.conv2d(mp,channels,[3,1],[1,1])
+        c = tf.contrib.layers.conv2d(mp,channels,[1,3],[1,1])
         mp = tf.nn.max_pool(c,[1,1,2,1],[1,1,2,1],"VALID")
     c = tf.contrib.layers.conv2d(mp,256,[1,1],[1,1])
 
