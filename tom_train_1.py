@@ -32,7 +32,7 @@ style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 200000
-learning_rate = 0.3
+learning_rate = 0.01
 # decay_every = 2000
 decay_rate = 0.10
 sample_rate = 16000 # per sec
@@ -215,14 +215,17 @@ keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
 
-features = make_features(wav_ph,"identity")
+features = make_features(wav_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = ttagau_conv(features,keep_prob,output_neurons,is_training_ph)
+final_layer = overdrive(features,keep_prob,output_neurons,is_training_ph)
 
 loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
 
+
+# update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+# with tf.control_dependencies(update_ops):
 train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(loss_mean)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
@@ -236,8 +239,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_ttagau_conv_3",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_ttagau_conv_3",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
