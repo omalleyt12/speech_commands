@@ -141,7 +141,10 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
 
         unknown_recs = int(batch_size * unknown_percentage / 100)
         for j in range(unknown_recs):
-            rand_unknown = np.random.randint(0,len(unknown_index[mode]))
+            if mode == "val": # Try and make val more deterministic
+                rand_unknown = j
+            else:
+                rand_unknown = np.random.randint(0,len(unknown_index[mode]))
             u_rec = unknown_index[mode][rand_unknown]["data"]
             if mode == "train":
                 u_rec = pp.unknown_word(u_rec,speakers,bg_data)
@@ -195,7 +198,7 @@ def run_validation(set_name):
                     "file":None
                 })
 
-        tf.logging.info("{} Step {} Accuracy {} Loss {}".format(set_name,i,val_acc,val_loss))
+        tf.logging.info("{} Step {} LR {} Accuracy {} Loss {}".format(set_name,i,learning_rate,val_acc,val_loss))
         df_words = all_words if style == "full" else wanted_words
 
         pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(set_name))
@@ -218,7 +221,7 @@ is_training_ph = tf.placeholder(tf.bool)
 features = make_features(wav_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = overdrive(features,keep_prob,output_neurons,is_training_ph)
+final_layer = drive_conv_log_mel(features,keep_prob,output_neurons,is_training_ph)
 
 loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
@@ -239,8 +242,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_drive_into_overdrive",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_drive_into_overdrive",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
