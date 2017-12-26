@@ -1,3 +1,4 @@
+*.ckpt*
 model_files/*
 *.csv
 *.wav
