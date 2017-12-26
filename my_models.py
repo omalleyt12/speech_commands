@@ -225,7 +225,7 @@ def drive_conv_log_mel(features,keep_prob,num_final_neurons,is_training):
 
     return final_layer
 
-def conv2d_bn(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME"):
+def conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME",mp=None,bn=True):
     """Make sure to update training ops when using this, can run something like:
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -233,18 +233,15 @@ def conv2d_bn(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME"):
 
     Also make sure to use the is_training placeholder
     """
-    return tf.contrib.layers.conv2d(x,channels,kernel_size,strides,normalizer_fn=tf.contrib.layers.batch_norm,normalizer_params={"is_training":is_training},padding=padding)
+    if bn:
+        c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,normalizer_fn=tf.contrib.layers.batch_norm,normalizer_params={"is_training":is_training},padding=padding)
+    else:
+        c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,padding=padding)
+    if mp is not None:
+        return tf.nn.max_pool(c,[1,mp[0],mp[1],1],[1,mp[0],mp[1],1],"VALID")
+    else:
+        return c
 
-
-
-
-
-
-
-# def inception(features,keep_prob,num_final_neurons):
-#     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
-
-#     def make_inception(in_layer):
 
 def tom1d(features,keep_prob,num_final_neurons):
     f = tf.reshape(features,[-1,features.shape[1],1,1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
@@ -327,34 +324,28 @@ def tom1d2(features,keep_prob,num_final_neurons):
 
     return final_layer
 
-def ttagau_conv(features,keep_prob,num_final_neurons):
-    from keras.layers import Conv1D, BatchNormalization, Activation, MaxPooling1D, GlobalAveragePooling1D, GlobalMaxPool1D
+def ttagau_conv(features,keep_prob,num_final_neurons,is_training):
+    x = tf.reshape(features,[-1,features.shape[1],1,1])
+    for i in range(10):
+        channels = int(8*(1.5**i))
+        x = conv2d(x,channels,[3,1],is_training,mp=[2,1])
 
-    x = tf.reshape(features,[-1,features.shape[1],1]) # pretend we're actually conv2d'ing a (16000,1) thing w/ one channel
-    for i in range(6):
-        x = Conv1D(8*(2 ** i), (3),padding = 'same')(x)
-        x = BatchNormalization()(x)
-        x = Activation('relu')(x)
-        x = MaxPooling1D((2), padding='same')(x)
+    print(x.shape)
+    x = tf.nn.max_pool(x,[1,x.shape[1],1,1],[1,x.shape[1],1,1],"VALID")
+    print(x.shape)
 
-    x_1d_branch_1 = GlobalAveragePooling1D()(x)
-    x_1d_branch_2 = GlobalMaxPool1D()(x)
-    x_1d_branch_1 = tf.contrib.layers.flatten(x_1d_branch_1)
-    x_1d_branch_2 = tf.contrib.layers.flatten(x_1d_branch_2)
+    x = tf.contrib.layers.flatten(x)
+    x = tf.nn.dropout(x,keep_prob)
+    print(x.shape)
 
-    x_1d = tf.concat([x_1d_branch_1,x_1d_branch_2],axis=1)
+    x = tf.contrib.layers.fully_connected(x,150)
+    print(x.shape)
 
-    print(x_1d.shape)
+    x = tf.nn.dropout(x,keep_prob)
 
-    dropout_x_1d = tf.nn.dropout(x_1d,keep_prob)
+    final_layer = tf.contrib.layers.fully_connected(x,num_final_neurons)
 
-    fc1 = tf.contrib.layers.fully_connected(dropout_x_1d,1024)
-
-    print(fc1.shape)
-    dropout_fc1 = tf.nn.dropout(fc1,keep_prob)
-
-    final_layer = tf.contrib.layers.fully_connected(dropout_fc1,keep_prob,activation_fn=None)
-
+    return final_layer
 
 
 def oned_conv(features,keep_prob,num_final_neurons,is_training):
