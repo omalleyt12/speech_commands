@@ -169,6 +169,34 @@ def overdrive(features,keep_prob,num_final_neurons,is_training):
     print(d.shape)
     return final_layer
 
+def rnn_overdrive(features,keep_prob,num_final_neurons,is_training):
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,128,[1,7],is_training,mp=[1,4])
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,512,[7,1],is_training,mp=[3,1])
+    print(c.shape)
+    c = tf.reshape(c,[-1,c.shape[1],c.shape[3]])
+    print(c.shape)
+
+    lstmcell = tf.contrib.rnn.LSTMCell(500, use_peepholes=True,num_proj=188)
+    _, last = tf.nn.dynamic_rnn(cell=lstmcell, inputs=c,
+                dtype=tf.float32)
+    flow = last[-1]
+
+    print(flow.shape)
+    dflow = tf.nn.dropout(flow,keep_prob)
+
+    fc = tf.contrib.layers.fully_connected(dflow,128)
+    dfc = tf.nn.dropout(fc,keep_prob)
+
+    final_layer = tf.contrib.layers.fully_connected(dfc,num_final_neurons,activation_fn=None)
+    print(final_layer.shape)
+    return final_layer
+
+
 def ttagau_conv(features,keep_prob,num_final_neurons,is_training):
     x = tf.reshape(features,[-1,features.shape[1],1,1])
     for i in range(10):
