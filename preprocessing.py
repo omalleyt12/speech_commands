@@ -11,21 +11,21 @@ def wanted_word(w,bg_data):
     return w
 
 def unknown_word(w,speakers,bg_data):
-    distortion_picker = np.random.uniform(0,1)
-    if distortion_picker < 0.3:
-        speaker = np.random.randint(0,len(speakers["train"]))
-        words = speakers["train"][speaker][1]
-        chosen = np.random.choice(len(words),2)
-        word1 = words[chosen[0]]["data"]
-        word2 = words[chosen[1]]["data"]
-        if distortion_picker < 0.2:
-            w = combine(word1,word2)
-        else:
-            w = add(word1,word2)
-    elif distortion_picker < 0.4:
-        w = reverse(w)
-    elif distortion_picker < 0.5:
-        w = wraparound(w)
+    # distortion_picker = np.random.uniform(0,1)
+    # if distortion_picker < 0.3:
+    #     speaker = np.random.randint(0,len(speakers["train"]))
+    #     words = speakers["train"][speaker][1]
+    #     chosen = np.random.choice(len(words),2)
+    #     word1 = words[chosen[0]]["data"]
+    #     word2 = words[chosen[1]]["data"]
+    #     if distortion_picker < 0.2:
+    #         w = combine(word1,word2)
+    #     else:
+    #         w = add(word1,word2)
+    # elif distortion_picker < 0.4:
+    #     w = reverse(w)
+    # elif distortion_picker < 0.5:
+    #     w = wraparound(w)
     w = pad(w)
     # w = pitch_shift(w)
     w = add_noise(w,bg_data)

@@ -154,12 +154,13 @@ def overdrive(features,keep_prob,num_final_neurons,is_training):
     c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
     c = conv2d(c,128,[1,7],is_training,mp=[1,4])
 
-    c = conv2d(c,256,[1,10],is_training,padding="VALID",mp=[98,1])
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
 
     c = tf.contrib.layers.flatten(c)
 
     d = tf.nn.dropout(c,keep_prob)
-    fc = tf.contrib.layers.fully_connected(d,50)
+    fc = tf.contrib.layers.fully_connected(d,128)
 
     d2 = tf.nn.dropout(fc,keep_prob)
 
