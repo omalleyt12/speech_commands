@@ -150,8 +150,9 @@ def parts_conv(features,keep_prob,num_final_neurons,is_training):
 
 def overdrive(features,keep_prob,num_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+    fd = tf.nn.dropout(fingerprint_4d,keep_prob)
 
-    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+    c = conv2d(fd,64,[7,3],is_training,mp=[1,3])
     c = conv2d(c,128,[1,7],is_training,mp=[1,4])
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
@@ -160,13 +161,10 @@ def overdrive(features,keep_prob,num_final_neurons,is_training):
     c = tf.contrib.layers.flatten(c)
 
     d = tf.nn.dropout(c,keep_prob)
-    fc = tf.contrib.layers.fully_connected(d,256)
+    fc = tf.contrib.layers.fully_connected(d,128)
     d2 = tf.nn.dropout(fc,keep_prob)
 
-    fc2 = tf.contrib.layers.fully_connected(d2,128)
-    d3 = tf.nn.dropout(fc2,keep_prob)
-
-    final_layer = tf.contrib.layers.fully_connected(d3,num_final_neurons)
+    final_layer = tf.contrib.layers.fully_connected(d2,num_final_neurons)
     print(c.shape)
     print(d.shape)
     return final_layer

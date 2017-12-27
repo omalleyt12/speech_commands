@@ -242,8 +242,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_v3",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_v3",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_v4",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_v4",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -266,7 +266,7 @@ for i in range(steps):
     if i % eval_step == 0 or i == (steps - 1):
         val_acc = run_validation("val")
         if val_acc < last_val_accuracy:
-            learning_rate = 0.5*learning_rate
+            learning_rate = 0.25*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
             # print("Restoring former model and rerunning validation")
             # saver.restore(sess,"./model.ckpt")
