@@ -160,11 +160,13 @@ def overdrive(features,keep_prob,num_final_neurons,is_training):
     c = tf.contrib.layers.flatten(c)
 
     d = tf.nn.dropout(c,keep_prob)
-    fc = tf.contrib.layers.fully_connected(d,128)
-
+    fc = tf.contrib.layers.fully_connected(d,256)
     d2 = tf.nn.dropout(fc,keep_prob)
 
-    final_layer = tf.contrib.layers.fully_connected(d2,num_final_neurons)
+    fc2 = tf.contrib.layers.fully_connected(d2,128)
+    d3 = tf.nn.dropout(fc2,keep_prob)
+
+    final_layer = tf.contrib.layers.fully_connected(d3,num_final_neurons)
     print(c.shape)
     print(d.shape)
     return final_layer
