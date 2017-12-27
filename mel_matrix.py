@@ -48,7 +48,7 @@ def _mel_to_hertz(mel_values, name=None):
     )
 
 
-def _hertz_to_mel(frequencies_hertz, name=None, is_training=False,vtlp_a=1.0,vtlp_f=4800,sampling_rate=16000):
+def _hertz_to_mel(frequencies_hertz, is_training=tf.constant(False),name=None,sampling_rate=16000):
   """Converts frequencies in `frequencies_hertz` in Hertz to the mel scale.
   Args:
     frequencies_hertz: A `Tensor` of frequencies in Hertz.
@@ -57,8 +57,8 @@ def _hertz_to_mel(frequencies_hertz, name=None, is_training=False,vtlp_a=1.0,vtl
     A `Tensor` of the same shape and type of `frequencies_hertz` containing
     frequencies in the mel scale.
   """
-  vtlp_a = tf.cast(vtlp_a,tf.float64)
-  vtlp_f = tf.cast(vtlp_f,tf.float64)
+  vtlp_a = tf.truncated_normal([],1.0,0.1,dtype=tf.float64)
+  vtlp_f = tf.cast(4800,tf.float64)
   with ops.name_scope(name, 'hertz_to_mel', [frequencies_hertz]):
     frequencies_hertz = ops.convert_to_tensor(frequencies_hertz)
     def vtlp(frequencies_hertz):
@@ -100,8 +100,6 @@ def linear_to_mel_weight_matrix(num_mel_bins=20,
                                 lower_edge_hertz=125.0,
                                 upper_edge_hertz=3800.0,
                                 is_training=False,
-                                vtlp_a=1.0,
-                                vtlp_f=4800,
                                 dtype=dtypes.float32,
                                 name=None):
   """Returns a matrix to warp linear scale spectrograms to the [mel scale][mel].
@@ -171,7 +169,7 @@ def linear_to_mel_weight_matrix(num_mel_bins=20,
         zero_float64, nyquist_hertz, num_spectrogram_bins)[bands_to_zero:]
     # will apply Vocal Tract Length Perturbation if vltp is not None
     spectrogram_bins_mel = array_ops.expand_dims(
-        _hertz_to_mel(linear_frequencies,is_training=is_training,vtlp_a=vtlp_a,vtlp_f=vtlp_f), 1)
+        _hertz_to_mel(linear_frequencies,is_training), 1)
 
     # Compute num_mel_bins triples of (lower_edge, center, upper_edge). The
     # center of each band is the lower and upper edge of the adjacent bands.

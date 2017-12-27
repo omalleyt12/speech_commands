@@ -195,6 +195,19 @@ def rnn_overdrive(features,keep_prob,num_final_neurons,is_training):
     print(final_layer.shape)
     return final_layer
 
+def dilated1d(features,keep_prob,num_final_neurons,is_training):
+    from keras.layers import Conv1D, MaxPool1D
+    c = tf.reshape(features,[-1,features.shape[1],1])
+    kernel_size = 3
+    c = Conv1D(8,3,padding="same")(c)
+    c = tf.nn.relu(c)
+    c = MaxPool1D()(c)
+
+    for i,channels in enumerate([16,32,32,64]):
+        c = Conv1D(channels,3,padding="causal",dilation_rate=2**i)(c)
+        c = tf.nn.relu(c)
+    print(c.shape)
+
 
 def ttagau_conv(features,keep_prob,num_final_neurons,is_training):
     x = tf.reshape(features,[-1,features.shape[1],1,1])
