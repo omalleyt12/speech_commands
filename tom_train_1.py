@@ -221,7 +221,7 @@ is_training_ph = tf.placeholder(tf.bool)
 features = make_features(wav_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = drive_conv_log_mel(features,keep_prob,output_neurons,is_training_ph)
+final_layer = overdrive(features,keep_prob,output_neurons,is_training_ph)
 
 loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
@@ -242,8 +242,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_drive_into_overdrive",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_drive_into_overdrive",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_v2",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_v2",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -251,20 +251,22 @@ sess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
 last_val_accuracy = 0
 for i in range(steps):
+    if i > 0 and i % 500 == 0:
+        learning_rate = 0.9*learning_rate
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
     feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate,is_training_ph: True})
     # now here's where we run the real, convnet part
     if i % 10 == 0:
         sum_val,acc_val,loss_val, _ = sess.run([merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
         train_writer.add_summary(sum_val,i)
-        tf.logging.info("Step {} Accuracy {} Cross Entropy {}".format(i,acc_val,loss_val))
+        tf.logging.info("Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
     else:
         sess.run(train_step,feed_dict)
 
     if i % eval_step == 0 or i == (steps - 1):
         val_acc = run_validation("val")
         if val_acc < last_val_accuracy:
-            learning_rate = decay_rate*learning_rate
+            learning_rate = 0.5*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
             # print("Restoring former model and rerunning validation")
             # saver.restore(sess,"./model.ckpt")
