@@ -229,7 +229,7 @@ loss_mean = tf.reduce_mean(loss)
 
 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # with tf.control_dependencies(update_ops):
-train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(loss_mean)
+train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9,use_nesterov=True).minimize(loss_mean)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
@@ -242,8 +242,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_rnn_overdrive",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_rnn_overdrive",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_nesterov",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_nesterov",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
