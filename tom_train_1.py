@@ -44,6 +44,8 @@ np.random.seed(0)
 tf.set_random_seed(0)
 
 sess = tf.InteractiveSession()
+from keras import backend as K
+K.set_session(sess)
 
 def load_train_data(style="full"):
     """
@@ -218,7 +220,7 @@ keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
 
-features = make_features(wav_ph,"log-mel")
+features = make_features(wav_ph,is_training,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 final_layer = rnn_overdrive(features,keep_prob,output_neurons,is_training_ph)
@@ -229,7 +231,7 @@ loss_mean = tf.reduce_mean(loss)
 
 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # with tf.control_dependencies(update_ops):
-train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9,use_nesterov=True).minimize(loss_mean)
+train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(loss_mean)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)

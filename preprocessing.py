@@ -1,8 +1,27 @@
+import tensorflow as tf
 import numpy as np
 import scipy as sp
 from toolz.functoolz import memoize
 
 sample_rate = 16000
+
+def tf_volume_equalize(wav):
+    control_vol = tf.convert_to_tensor(0.1,tf.float32)
+    chunks = tf.split(wav,50)
+    vols = [tf.sqrt(tf.reduce_mean(tf.pow(chunk,2))) for chunk in chunks]
+    vols = tf.convert_to_tensor(vols)
+    max_vol = tf.reduce_max(vols)
+    new_wav = tf.cond(tf.equal(max_vol,0),lambda: wav, lambda: tf.clip_by_value(wav*control_vol/max_vol,-1.0,1.0))
+    return new_wav
+
+def tf_preprocess(wavs,is_training):
+    return tf.cond(is_training,lambda: tf.map_fn(train_preprocess,wavs,parallel_iterations=120),lambda: tf.map_fn(test_preprocess,wavs,parallel_iterations=120))
+
+def train_preprocess(wav):
+    return tf_volume_equalize(wav)
+
+def test_preprocess(wav):
+    return tf_volume_equalize(wav)
 
 def wanted_word(w,bg_data):
     w = pad(w)
