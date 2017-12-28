@@ -220,7 +220,7 @@ keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
 
-features = make_features(wav_ph,is_training,"log-mel")
+features = make_features(wav_ph,is_training_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 final_layer = rnn_overdrive(features,keep_prob,output_neurons,is_training_ph)
