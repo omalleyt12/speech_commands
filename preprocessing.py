@@ -23,6 +23,11 @@ def train_preprocess(wav):
 def test_preprocess(wav):
     return tf_volume_equalize(wav)
 
+
+def tf_resample(wav):
+    return tf.image.resize_images(tf.reshape(wav,[wav.shape[0],1,1]),[16000,1])
+
+
 def wanted_word(w,bg_data):
     w = pad(w)
     # w = pitch_shift(w)
