@@ -109,8 +109,6 @@ def get_speakers(unknown_index,data_index):
         speakers[set_name] = [u for u in speakers[set_name] if len(u[1]) > 2]
     return speakers
 
-wav_ph = tf.placeholder(tf.float32,[None,sample_rate])
-bg_wavs_ph = tf.placeholder(tf.float32,[None,sample_rate])
 
 def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
     """Does preprocessing of WAVs and returns the feed_dict for a batch"""
@@ -139,7 +137,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
     if mode != "comp": # add silence and unknowns to batches randomly
         silence_recs = int(batch_size * silence_percentage / 100)
         for j in range(silence_recs):
-            silence_rec = np.zeros(sample_rate,dtye=np.float32) 
+            silence_rec = np.zeros(sample_rate,dtype=np.float32) 
             if mode == "val":
                 silence_rec += pp.get_noise(bg_data) # since noise won't be added to any val data records
             # silence_rec = pp.add_noise(np.zeros(sample_rate,dtype=np.float32),bg_data)
@@ -224,6 +222,7 @@ bg_data = wl.load_bg_data(sess)
 
 labels_ph = tf.placeholder(tf.int32,(None))
 wav_ph = tf.placeholder(tf.float32,(None,sample_rate))
+bg_wavs_ph = tf.placeholder(tf.float32,[None,sample_rate])
 keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
@@ -254,8 +253,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_vtlp_real",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_vtlp_real",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_vtlp_new_padding",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_vtlp_new_padding",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)

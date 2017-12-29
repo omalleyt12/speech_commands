@@ -195,6 +195,35 @@ def rnn_overdrive(features,keep_prob,num_final_neurons,is_training):
     print(final_layer.shape)
     return final_layer
 
+def resdilate(features,keep_prob,num_final_neurons,is_training):
+    """A model inspired by ResNet and WaveNet to use dilated convolutions and residual connections"""
+    def cool_layer(input_layer,channels):
+        x = tf.contrib.layers.conv2d(input_layer,channels,[3,1])
+        c1 = tf.contrib.layers.conv2d(x,channels,[3,1],rate=[2,1])
+        c2 = tf.contrib.layers.conv2d(c1,channels,[3,1],rate=[4,1],activation_fn=None)
+        res = tf.nn.relu(c2 + x)
+        mp = tf.nn.max_pool(res,[1,2,1,1],[1,2,1,1],"VALID")
+        return mp
+
+    c = tf.reshape(features,[-1,features.shape[1],1,1])
+    for channels in [8,16,32,64,128,256,512]:
+        c = cool_layer(c,channels)
+        print(c.shape)
+    c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
+    print(c.shape)
+    c = tf.contrib.layers.flatten(c)
+    print(c.shape)
+    c = tf.nn.dropout(c,keep_prob)
+
+    fc = tf.contrib.layers.fully_connected(c,128)
+    fc = tf.nn.dropout(fc,keep_prob)
+    print(fc.shape)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(final_layer.shape)
+
+
+
 def dilated1d(features,keep_prob,num_final_neurons,is_training):
     from keras.layers import Conv1D, MaxPool1D
     c = tf.reshape(features,[-1,features.shape[1],1])
