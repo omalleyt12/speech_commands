@@ -40,3 +40,5 @@ def load_bg_data(sess):
         wav_data = wav_loader.load(wav_path,sess)
         bg_data.append(wav_data)
     return bg_data
+
+

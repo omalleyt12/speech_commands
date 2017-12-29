@@ -110,11 +110,13 @@ def get_speakers(unknown_index,data_index):
     return speakers
 
 wav_ph = tf.placeholder(tf.float32,[None,sample_rate])
+bg_wavs_ph = tf.placeholder(tf.float32,[None,sample_rate])
 
 def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
     """Does preprocessing of WAVs and returns the feed_dict for a batch"""
     recs = []
     labels = []
+    bg_wavs = []
     if offset + batch_size > len(data_index):
         batch_size = len(data_index) - offset
 
@@ -125,21 +127,26 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         rec = data_index[samp_index]
         rec_data = rec["data"]
 
-        if mode == "train":
-            rec_data = pp.wanted_word(rec_data,bg_data)
-        rec_data = pp.volume_equalizer(rec_data)
+        # if mode == "train":
+        #     rec_data = pp.wanted_word(rec_data,bg_data)
+        # rec_data = pp.volume_equalizer(rec_data)
 
         if mode != "comp":
             labels.append(rec["label_index"])
         recs.append(rec_data)
+        bg_wavs.append(pp.get_noise(bg_data))
 
     if mode != "comp": # add silence and unknowns to batches randomly
         silence_recs = int(batch_size * silence_percentage / 100)
         for j in range(silence_recs):
-            silence_rec = pp.add_noise(np.zeros(sample_rate,dtype=np.float32),bg_data)
-            silence_rec = pp.volume_equalizer(silence_rec)
+            silence_rec = np.zeros(sample_rate,dtye=np.float32) 
+            if mode == "val":
+                silence_rec += pp.get_noise(bg_data) # since noise won't be added to any val data records
+            # silence_rec = pp.add_noise(np.zeros(sample_rate,dtype=np.float32),bg_data)
+            # silence_rec = pp.volume_equalizer(silence_rec)
             recs.append(silence_rec)
             labels.append(all_words_index["silence"])
+            bg_wavs.append(pp.get_noise(bg_data))
 
         unknown_recs = int(batch_size * unknown_percentage / 100)
         for j in range(unknown_recs):
@@ -148,13 +155,14 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
             else:
                 rand_unknown = np.random.randint(0,len(unknown_index[mode]))
             u_rec = unknown_index[mode][rand_unknown]["data"]
-            if mode == "train":
-                u_rec = pp.unknown_word(u_rec,speakers,bg_data)
-            u_rec = pp.volume_equalizer(u_rec)
+            # if mode == "train":
+            #     u_rec = pp.unknown_word(u_rec,speakers,bg_data)
+            # u_rec = pp.volume_equalizer(u_rec)
             recs.append(u_rec)
             labels.append(1)
+            bg_wavs.append(pp.get_noise(bg_data))
 
-    feed_dict={ wav_ph: np.stack(recs)}
+    feed_dict={ wav_ph: np.stack(recs), bg_wavs_ph: np.stack(bg_wavs)}
     if mode != "comp":
         feed_dict[labels_ph] = np.stack(labels).astype(np.int32)
     return feed_dict
@@ -220,7 +228,9 @@ keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
 
-features = make_features(wav_ph,is_training_ph,"log-mel")
+processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
+
+features = make_features(processed_wavs,is_training_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 final_layer = overdrive(features,keep_prob,output_neurons,is_training_ph)
