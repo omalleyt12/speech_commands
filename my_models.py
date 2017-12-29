@@ -172,6 +172,7 @@ def overdrive(features,keep_prob,num_final_neurons,is_training):
     return final_layer
 
 def overdrive_bn(features,keep_prob,num_final_neurons,is_training):
+    """This is my best so far"""
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
     c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
@@ -187,6 +188,25 @@ def overdrive_bn(features,keep_prob,num_final_neurons,is_training):
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
     print(c.shape)
     return final_layer
+
+def overdrive_full_bn(features,keep_prob,num_final_neurons,is_training):
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,128,[1,7],is_training,mp=[1,4])
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
+
+    c = tf.contrib.layers.flatten(c)
+
+    fc = tf.contrib.layers.fully_connected(c,128)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(c.shape)
+    return final_layer
+
 
 def rnn_overdrive(features,keep_prob,num_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
@@ -227,13 +247,15 @@ def resdilate(features,keep_prob,num_final_neurons,is_training):
 
     def cool_layer_bn(input_layer,channels,scope,is_training):
         x = tf.contrib.layers.conv2d(input_layer,channels,[3,1],activation_fn=None)
-        x = bn.bn_layer_top(x,scope + "_bn1",is_training)
+        x = tf.contrib.slim.batch_norm(x,is_training=is_training,decay=0.9)
         x = tf.nn.relu(x)
         c1 = tf.contrib.layers.conv2d(x,channels,[3,1],rate=[2,1],activation_fn=None)
-        c1 = bn.bn_layer_top(c1,scope + "_bn1",is_training)
+        c1 = tf.contrib.slim.batch_norm(c1,is_training=is_training,decay=0.9)
         c1 = tf.nn.relu(c1)
         c2 = tf.contrib.layers.conv2d(c1,channels,[3,1],rate=[4,1],activation_fn=None)
-        res = bn.bn_layer_top(c2+x,scope + "_bn2",is_training)
+        c2 = tf.contrib.slim.batch_norm(c2,is_training=is_training,decay=0.9)
+        c2 - tf.nn.relu(c2)
+        res = x + c2
         res = tf.nn.relu(res)
         mp = tf.nn.max_pool(res,[1,2,1,1],[1,2,1,1],"VALID")
         return mp
@@ -241,6 +263,38 @@ def resdilate(features,keep_prob,num_final_neurons,is_training):
 
     c = tf.reshape(features,[-1,features.shape[1],1,1])
     for channels in [8,16,32,64,128,256,512]:
+        c = cool_layer(c,channels,str(channels),is_training)
+        print(c.shape)
+    c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
+    print(c.shape)
+    c = tf.contrib.layers.flatten(c)
+    print(c.shape)
+    # c = tf.nn.dropout(c,keep_prob)
+
+    fc = tf.contrib.layers.fully_connected(c,128)
+    # fc = tf.nn.dropout(fc,keep_prob)
+    print(fc.shape)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(final_layer.shape)
+    return final_layer
+
+def small_resdilate(features,keep_prob,num_final_neurons,is_training):
+    def cool_layer_bn(input_layer,channels,scope,is_training):
+        x = tf.contrib.layers.conv2d(input_layer,channels,[7,1],activation_fn=None)
+        x = tf.contrib.slim.batch_norm(x,is_training=is_training,decay=0.9)
+        x = tf.nn.relu(x)
+        c1 = tf.contrib.layers.conv2d(x,channels,[7,1],rate=[2,1],activation_fn=None)
+        c1 = tf.contrib.slim.batch_norm(c1,is_training=is_training,decay=0.9)
+        c1 = tf.nn.relu(c1)
+        res = x + c1
+        res = tf.nn.relu(res)
+        mp = tf.nn.max_pool(res,[1,3,1,1],[1,3,1,1],"VALID")
+        return mp
+
+    c = tf.reshape(features,[-1,features.shape[1],1,1])
+    c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
+    for channels in [8,16,32,64,128]:
         c = cool_layer_bn(c,channels,str(channels),is_training)
         print(c.shape)
     c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
