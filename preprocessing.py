@@ -59,6 +59,14 @@ def tf_pad(wav):
     wav = tf.pad(wav,[[left_pad,right_pad]])
     return wav
 
+def tf_simple_pad(wav):
+    pad = tf.random_uniform([],-100,100,dtype=tf.int32)
+    wav = tf.cond(tf.less(pad,0),
+                  lambda: tf.slice(tf.pad(wav,[[0,-pad]]),[-pad],[16000]),
+                  lambda: tf.slice(tf.pad(wav,[[pad,0]]),[0],[16000])
+    )
+    return wav
+
 def tf_add_noise(wav,bg_wav):
     # I'll let NumPy handle all the picking of the WAV files, etc
     return wav + bg_wav
@@ -68,7 +76,7 @@ def tf_volume_equalize(wav):
     control_vol = tf.convert_to_tensor(0.1,tf.float32)
     chunks = tf.split(wav,50)
     vols = [tf.sqrt(tf.reduce_mean(tf.pow(chunk,2))) for chunk in chunks]
-    vols = tf.convert_to_tensor(vols)
+    vols = tf.stack(vols)
     max_vol = tf.reduce_max(vols)
     new_wav = tf.cond(tf.equal(max_vol,0),lambda: wav, lambda: tf.clip_by_value(wav*control_vol/max_vol,-1.0,1.0))
     return new_wav
