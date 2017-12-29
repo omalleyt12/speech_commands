@@ -5,6 +5,62 @@ from toolz.functoolz import memoize
 
 sample_rate = 16000
 
+
+def tf_preprocess(wavs,bg_wavs,is_training):
+    return tf.cond(is_training,
+                   lambda: tf.map_fn(train_preprocess,[wavs,bg_wavs],parallel_iterations=120,dtype=tf.float32),
+                   lambda: tf.map_fn(test_preprocess,wavs,parallel_iterations=120)
+    )
+
+def train_preprocess(wav,bg_wav):
+    wav = tf_pitch_shift(wav)
+    wav = tf_time_stretch(wav)
+    wav = tf_pad(wav)
+    wav = tf_add_noise(wav,bg_wav)
+    return tf_volume_equalize(wav)
+
+def test_preprocess(wav):
+    return tf_volume_equalize(wav)
+
+def tf_pitch_shift(wav):
+    pitch = tf.truncated_normal([],0,5)
+    frame_length = 300
+    frame_step_in = int(0.25 * 300)
+    resample_x = 2**(pitch/12)
+    frame_step_out = tf.cast(frame_step_in*resample_x,tf.int32)
+    s = tf.contrib.signal.stft(wav,frame_length,frame_step_in)
+    a = tf.contrib.signal.inverse_stft(s,frame_length,frame_step_out)
+    return tf_resample(a)
+
+def tf_time_stretch(wav):
+    speedx = tf.truncated_normal([],1,0.2)
+    frame_length = 300
+    frame_step_in = int(0.25 * 300)
+    frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)
+    s = tf.contrib.signal.stft(wav,frame_length,frame_step_in)
+    a = tf.contrib.signal.inverse_stft(s,frame_length,frame_step_out)
+    return tf_get_word(a,16000)
+
+def tf_get_word(wav,size=16000):
+    frames = shape_ops.frame(wav,size,300,pad_end=True)
+    frame_stack = tf.stack(frames)
+    frame_vols = tf.reduce_mean(tf.pow(frame_stack,2),axis=1)
+    max_frame_vol = tf.argmax(frame_vols)
+    return frame_stack[max_frame_vol,:]
+
+def tf_pad(wav):
+    word_frame_size = tf.random_uniform([],12000,16000,dtype=tf.int32)
+    left_pad = tf.random_uniform([],0,16000 - word_frame_size,dtype=tf.int32)
+    right_pad = 16000 - word_frame_size - left_pad
+    wav = tf_get_word(wav,word_frame_size)
+    wav = tf.pad(wav,[[left_pad,right_pad]])
+    return wav
+
+def tf_add_noise(wav,bg_wav):
+    # I'll let NumPy handle all the picking of the WAV files, etc
+    return wav + bg_wav
+
+
 def tf_volume_equalize(wav):
     control_vol = tf.convert_to_tensor(0.1,tf.float32)
     chunks = tf.split(wav,50)
@@ -14,18 +70,35 @@ def tf_volume_equalize(wav):
     new_wav = tf.cond(tf.equal(max_vol,0),lambda: wav, lambda: tf.clip_by_value(wav*control_vol/max_vol,-1.0,1.0))
     return new_wav
 
-def tf_preprocess(wavs,is_training):
-    return tf.cond(is_training,lambda: tf.map_fn(train_preprocess,wavs,parallel_iterations=120),lambda: tf.map_fn(test_preprocess,wavs,parallel_iterations=120))
-
-def train_preprocess(wav):
-    return tf_volume_equalize(wav)
-
-def test_preprocess(wav):
-    return tf_volume_equalize(wav)
-
-
 def tf_resample(wav):
-    return tf.image.resize_images(tf.reshape(wav,[wav.shape[0],1,1]),[16000,1])
+    resampled = tf.image.resize_images(tf.reshape(wav,[-1,1,1]),[16000,1])
+    return tf.reshape(resampled,[resampled.shape[0]])
+
+def tf_phase_vocode(s,frame_step_in,sampling_rate=16000):
+    """This is unneccesary, even bad for some reason"""
+    delta_t = tf.convert_to_tensor(frame_step_in / sampling_rate,tf.complex64)
+    imag_i = tf.convert_to_tensor(1j,tf.complex64)
+    print(imag_i.dtype)
+    frames = tf.unstack(s)
+    phase_shift = tf.zeros(s.shape[1],tf.complex64)
+    for i, frame_tup in enumerate(zip(frames[:-1],frames[1:])):
+        frame1, frame2 = frame_tup
+
+        phase_change = tf.cast(tf.angle(frame2) - tf.angle(frame1),tf.complex64)
+
+        freq_deviation = phase_change/delta_t - frame2
+        freq_dev_angle = tf.mod(tf.angle(freq_deviation) + np.pi,2*np.pi) - np.pi
+        freq_dev_angle = tf.cast(freq_dev_angle,tf.complex64)
+        freq_dev_mag = tf.abs(freq_deviation)
+        freq_dev_mag = tf.cast(freq_dev_mag,tf.complex64)
+        wrapped_freq_deviation = freq_dev_mag * tf.exp(freq_dev_angle*imag_i)
+        true_freq = frame2 + wrapped_freq_deviation
+
+        phase_shift = phase_shift + delta_t*true_freq
+        true_bins = tf.cast(tf.abs(frame2),tf.complex64)*tf.exp(tf.cast(tf.angle(phase_shift),tf.complex64)*imag_i)
+        frames[i+1] = true_bins
+    return tf.stack(frames)
+
 
 
 def wanted_word(w,bg_data):
@@ -101,7 +174,7 @@ def pad(wav):
 #         b = np.pad(d,(0,-pad_num),mode="constant")[-pad_num:]
 #     return b
 
-def add_noise(d,bg_data):
+def get_noise(bg_data):
     background_frequency = 0.8
     max_background_volume = 0.1
     bg_index = np.random.randint(len(bg_data))
@@ -112,7 +185,7 @@ def add_noise(d,bg_data):
         bg_volume = np.random.uniform(0,max_background_volume)
     else:
         bg_volume = 0
-    return d + bg_volume*bg_sliced
+    return bg_volume*bg_sliced
 
 def reverse(d):
     return d[::-1]
