@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import scipy as sp
 from toolz.functoolz import memoize
+from tensorflow.contrib.signal.python.ops import shape_ops
 
 sample_rate = 16000
 
@@ -12,9 +13,11 @@ def tf_preprocess(wavs,bg_wavs,is_training):
                    lambda: tf.map_fn(test_preprocess,wavs,parallel_iterations=120)
     )
 
-def train_preprocess(wav,bg_wav):
-    wav = tf_pitch_shift(wav)
-    wav = tf_time_stretch(wav)
+def train_preprocess(tensors):
+    wav = tensors[0]
+    bg_wav = tensors[1]
+    # wav = tf_pitch_shift(wav)
+    # wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
     wav = tf_add_noise(wav,bg_wav)
     return tf_volume_equalize(wav)
