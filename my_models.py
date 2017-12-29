@@ -1,4 +1,5 @@
 import tensorflow as tf
+import custom_bn as bn
 from keras.layers import GlobalMaxPool2D
 
 def vggnet(features,keep_prob,num_final_neurons):
@@ -105,7 +106,7 @@ def drive_conv_log_mel(features,keep_prob,num_final_neurons,is_training):
 
 
 
-def conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME",mp=None,bn=False):
+def conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME",mp=None,bn=True):
     """Make sure to update training ops when using this, can run something like:
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -114,7 +115,9 @@ def conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME",mp=No
     Also make sure to use the is_training placeholder
     """
     if bn:
-        c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,normalizer_fn=tf.contrib.layers.batch_norm,normalizer_params={"is_training":is_training},padding=padding)
+        c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,padding=padding,activation_fn=None)
+        c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
+        c = tf.nn.relu(c)
     else:
         c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,padding=padding)
     if mp is not None:
@@ -197,7 +200,7 @@ def rnn_overdrive(features,keep_prob,num_final_neurons,is_training):
 
 def resdilate(features,keep_prob,num_final_neurons,is_training):
     """A model inspired by ResNet and WaveNet to use dilated convolutions and residual connections"""
-    def cool_layer(input_layer,channels):
+    def cool_layer(input_layer,channels,scope,is_training):
         x = tf.contrib.layers.conv2d(input_layer,channels,[3,1])
         c1 = tf.contrib.layers.conv2d(x,channels,[3,1],rate=[2,1])
         c2 = tf.contrib.layers.conv2d(c1,channels,[3,1],rate=[4,1],activation_fn=None)
@@ -205,22 +208,37 @@ def resdilate(features,keep_prob,num_final_neurons,is_training):
         mp = tf.nn.max_pool(res,[1,2,1,1],[1,2,1,1],"VALID")
         return mp
 
+    def cool_layer_bn(input_layer,channels,scope,is_training):
+        x = tf.contrib.layers.conv2d(input_layer,channels,[3,1],activation_fn=None)
+        x = bn.bn_layer_top(x,scope + "_bn1",is_training)
+        x = tf.nn.relu(x)
+        c1 = tf.contrib.layers.conv2d(x,channels,[3,1],rate=[2,1],activation_fn=None)
+        c1 = bn.bn_layer_top(c1,scope + "_bn1",is_training)
+        c1 = tf.nn.relu(c1)
+        c2 = tf.contrib.layers.conv2d(c1,channels,[3,1],rate=[4,1],activation_fn=None)
+        res = bn.bn_layer_top(c2+x,scope + "_bn2",is_training)
+        res = tf.nn.relu(res)
+        mp = tf.nn.max_pool(res,[1,2,1,1],[1,2,1,1],"VALID")
+        return mp
+
+
     c = tf.reshape(features,[-1,features.shape[1],1,1])
     for channels in [8,16,32,64,128,256,512]:
-        c = cool_layer(c,channels)
+        c = cool_layer_bn(c,channels,str(channels),is_training)
         print(c.shape)
     c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
     print(c.shape)
     c = tf.contrib.layers.flatten(c)
     print(c.shape)
-    c = tf.nn.dropout(c,keep_prob)
+    # c = tf.nn.dropout(c,keep_prob)
 
     fc = tf.contrib.layers.fully_connected(c,128)
-    fc = tf.nn.dropout(fc,keep_prob)
+    # fc = tf.nn.dropout(fc,keep_prob)
     print(fc.shape)
 
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
     print(final_layer.shape)
+    return final_layer
 
 
 

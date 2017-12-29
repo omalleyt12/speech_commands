@@ -32,7 +32,7 @@ style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 200000
-learning_rate = 0.01
+learning_rate = 0.1
 # decay_every = 2000
 decay_rate = 0.10
 sample_rate = 16000 # per sec
@@ -238,6 +238,7 @@ loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=f
 loss_mean = tf.reduce_mean(loss)
 
 
+update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # with tf.control_dependencies(update_ops):
 train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(loss_mean)
@@ -253,8 +254,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_vtlp_new_padding",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_vtlp_new_padding",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_bn",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_bn",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -268,7 +269,7 @@ for i in range(steps):
     feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate,is_training_ph: True})
     # now here's where we run the real, convnet part
     if i % 10 == 0:
-        sum_val,acc_val,loss_val, _ = sess.run([merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
+        _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
         train_writer.add_summary(sum_val,i)
         tf.logging.info("Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
     else:
