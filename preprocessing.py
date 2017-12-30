@@ -218,6 +218,7 @@ def get_noise(bg_data):
         bg_volume = np.random.uniform(0,max_background_volume)
     else:
         bg_volume = 0
+    bg_sliced = np.clip(bg_sliced*0.01/np.sqrt(np.mean(bg_sliced**2)),-1.0,1.0)
     return bg_volume*bg_sliced
 
 def reverse(d):
