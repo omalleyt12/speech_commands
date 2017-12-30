@@ -345,11 +345,14 @@ def small_resdilate(features,keep_prob,num_final_neurons,is_training):
 
 def medium_resdilate(features,keep_prob,num_final_neurons,is_training):
     def cool_layer_bn(input_layer,channels,scope,is_training):
-        """This allows x to pass freely through the dilation convolutions (one at the moment)"""
+        """
+        This allows x to pass freely through the dilation convolutions (one at the moment)
+        Based on ideas from WaveNet and "Identity Mappings in Deep Residual Networks"
+        """
         x = tf.contrib.slim.conv2d(input_layer,channels,[7,1],activation_fn=None,weights_regularizer=tf.contrib.slim.l2_regularizer(0.0005))
         c = x
         for dilations in [2]:
-            c = tf.contrib.slim.batch_norm(x,is_training=is_training,decay=0.9)
+            c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
             c = tf.nn.relu(c)
             c = tf.contrib.slim.conv2d(c,channels,[7,1],rate=[2,1],activation_fn=None,weights_regularizer=tf.contrib.slim.l2_regularizer(0.0005))
         res = x + c
@@ -367,10 +370,10 @@ def medium_resdilate(features,keep_prob,num_final_neurons,is_training):
     print(c.shape)
     c = tf.contrib.layers.flatten(c)
     print(c.shape)
-    # c = tf.nn.dropout(c,keep_prob)
 
-    fc = tf.contrib.layers.fully_connected(c,128)
-    # fc = tf.nn.dropout(fc,keep_prob)
+    fc = tf.contrib.layers.fully_connected(c,128,activation_fn=None)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
+    fc = tf.nn.relu(fc)
     print(fc.shape)
 
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)

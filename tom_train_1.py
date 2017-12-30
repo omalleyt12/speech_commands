@@ -234,14 +234,14 @@ features = make_features(processed_wavs,is_training_ph,"log-mel")
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 final_layer = overdrive_full_bn(features,keep_prob,output_neurons,is_training_ph)
 
-loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph, logits=final_layer)
-loss_mean = tf.reduce_mean(loss)
+loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
 
+total_loss = tf.losses.get_total_loss()
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # with tf.control_dependencies(update_ops):
-train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(loss_mean)
+train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(total_loss)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
