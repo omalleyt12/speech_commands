@@ -18,11 +18,11 @@ def train_preprocess(tensors):
     wav = tensors[0]
     bg_wav = tensors[1]
     # wav = tf_pitch_shift(wav)
-    # wav = tf_time_stretch(wav)
+    wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
     wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
     wav = tf_add_noise(wav,bg_wav)
-    return tf_volume_equalize(wav)
+    return tf_volume_equalize(wav) # equalize the volume again AFTER adding noise
 
 def test_preprocess(wav):
     return tf_volume_equalize(wav)

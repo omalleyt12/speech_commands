@@ -125,10 +125,6 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         rec = data_index[samp_index]
         rec_data = rec["data"]
 
-        # if mode == "train":
-        #     rec_data = pp.wanted_word(rec_data,bg_data)
-        # rec_data = pp.volume_equalizer(rec_data)
-
         if mode != "comp":
             labels.append(rec["label_index"])
         recs.append(rec_data)
@@ -140,8 +136,6 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
             silence_rec = np.zeros(sample_rate,dtype=np.float32) 
             if mode == "val":
                 silence_rec += pp.get_noise(bg_data) # since noise won't be added to any val data records
-            # silence_rec = pp.add_noise(np.zeros(sample_rate,dtype=np.float32),bg_data)
-            # silence_rec = pp.volume_equalizer(silence_rec)
             recs.append(silence_rec)
             labels.append(all_words_index["silence"])
             bg_wavs.append(pp.get_noise(bg_data))
@@ -153,9 +147,6 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
             else:
                 rand_unknown = np.random.randint(0,len(unknown_index[mode]))
             u_rec = unknown_index[mode][rand_unknown]["data"]
-            # if mode == "train":
-            #     u_rec = pp.unknown_word(u_rec,speakers,bg_data)
-            # u_rec = pp.volume_equalizer(u_rec)
             recs.append(u_rec)
             labels.append(1)
             bg_wavs.append(pp.get_noise(bg_data))
@@ -229,10 +220,10 @@ is_training_ph = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 
-features = make_features(processed_wavs,is_training_ph,"identity")
+features = make_features(processed_wavs,is_training_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = medium_resdilate(features,keep_prob,output_neurons,is_training_ph)
+final_layer = overdrive_full_bn(features,keep_prob,output_neurons,is_training_ph)
 
 loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
 
@@ -254,8 +245,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_medium_resdilate_3_dilate",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_medium_resdilate_3_dilate",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_full_bn_new_noise",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_full_bn_new_noise",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -311,7 +302,6 @@ while offset < len(test_index):
     test_files = [t["identifier"] for t in test_index[offset:(offset + test_batch_size)] ]
     test_batch_df = pd.DataFrame([{"fname":ti,"label":tl} for ti,tl in zip(test_files,test_labels)])
     offset += test_batch_size
-    print(offset)
     df = pd.concat([df,test_batch_df])
 df.to_csv("my_guesses_3.csv",index=False)
 

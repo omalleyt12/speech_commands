@@ -218,7 +218,7 @@ def slim_conv2d(input_channel,channels,kernel_size,is_training,padding="SAME",mp
 
 def overdrive_full_bn_reg(features,keep_prob,num_final_neurons,is_training):
     """A fully, correctly Batch Normalized network with weight penalties and dropout and a larger FC layer"""
-    l2_penalty = 0.0005
+    l2_penalty = 0.005
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
     c = slim_conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3],l2_penalty=l2_penalty)
