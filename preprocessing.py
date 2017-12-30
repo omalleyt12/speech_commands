@@ -201,27 +201,39 @@ def red_noise(r=0.5):
         red[i+1] = r*red[i] + ((1-r**2)**0.5)*white[i+1]
     return red
 
-# Further improvements: Use combinations of the noises (with varying volume but must volume equalize first) to get even more synthetic sound
+# Further improvements:
+# Multiply slices together too
+# maybe use combos of 10 of the training samples, all very quiet, to simulate real background conversation
+# maybe increase max_background_volume to 0.2 or 0.3
 def get_noise(bg_data):
     background_frequency = 0.8
     max_background_volume = 0.1
-    if np.random.uniform(0,1) < 0.5: # use regular background noise
-        bg_index = np.random.randint(len(bg_data))
-        bg_samp = bg_data[bg_index]
-        bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
-        bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
-    else: # use generated white and red noise
-        if np.random.uniform(0,1) < 0.25:
-            bg_sliced = white_noise()
-        else:
-            r = np.random.uniform(0.01,0.99)
-            bg_sliced = red_noise(r)
+    bg_sounds = []
+    for _ in range(2):
+        if np.random.uniform(0,1) < 0.5: # use regular background noise
+            bg_index = np.random.randint(len(bg_data))
+            bg_samp = bg_data[bg_index]
+            bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
+            bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
+        else: # use generated white and red noise
+            if np.random.uniform(0,1) < 0.25:
+                bg_sliced = white_noise()
+            else:
+                r = np.random.uniform(0.01,0.99)
+                bg_sliced = red_noise(r)
+        bg_sliced = np.clip(bg_sliced*0.1/np.sqrt(np.mean(bg_sliced**2)),-1.0,1.0)
+        bg_sounds.append(bg_sliced)
+    combiner = np.random.uniform(0,1)
+    if combiner < 0.66:
+        bg_combined = bg_sounds[0] + bg_sounds[1]
+    else:
+        bg_combined = bg_sounds[0]
+    bg_combined = np.clip(bg_combined*0.1/np.sqrt(np.mean(bg_combined**2)),-1.0,1.0)
     if np.random.uniform(0,1) < background_frequency:
         bg_volume = np.random.uniform(0,max_background_volume)
     else:
         bg_volume = 0
-    bg_sliced = np.clip(bg_sliced*0.1/np.sqrt(np.mean(bg_sliced**2)),-1.0,1.0)
-    return bg_volume*bg_sliced
+    return bg_volume*bg_combined
 
 def reverse(d):
     return d[::-1]
