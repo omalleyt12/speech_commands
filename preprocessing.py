@@ -1,3 +1,4 @@
+from numba import jit
 import tensorflow as tf
 import numpy as np
 import scipy as sp
@@ -17,7 +18,7 @@ def train_preprocess(tensors):
     wav = tensors[0]
     bg_wav = tensors[1]
     # wav = tf_pitch_shift(wav)
-    wav = tf_time_stretch(wav)
+    # wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
     wav = tf_add_noise(wav,bg_wav)
     return tf_volume_equalize(wav)
@@ -185,13 +186,34 @@ def pad(wav):
 #         b = np.pad(d,(0,-pad_num),mode="constant")[-pad_num:]
 #     return b
 
+# still have to normalize the level of the noise (50x too high)
+def white_noise():
+    return (np.random.rand(16000,)*2 - 1).astype(np.float32)
+
+@jit
+def red_noise(r=0.5):
+    """0 < r < 1, zero is white noise, bigger r shifts more towards lower frequencies"""
+    white = white_noise()
+    red = np.zeros((16000),dtype=np.float32)
+    red[0] = white[0]
+    for i,ele in enumerate(white):
+        red[i+1] = r*red[i] + ((1-r**2)**0.5)*white[i+1]
+    return re d
+
 def get_noise(bg_data):
     background_frequency = 0.8
     max_background_volume = 0.1
-    bg_index = np.random.randint(len(bg_data))
-    bg_samp = bg_data[bg_index]
-    bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
-    bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
+    if np.random.uniform(0,1) < 0.5: # use regular background noise
+        bg_index = np.random.randint(len(bg_data))
+        bg_samp = bg_data[bg_index]
+        bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
+        bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
+    else: # use generated white and red noise
+        if np.random.uniform(0,1) < 0.25:
+            bg_sliced = white_noise()
+        else:
+            r = np.random.uniform(0.01,0.99)
+            bg_sliced = red_noise(r_)
     if np.random.uniform(0,1) < background_frequency:
         bg_volume = np.random.uniform(0,max_background_volume)
     else:
