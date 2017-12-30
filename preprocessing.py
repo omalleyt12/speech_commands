@@ -20,6 +20,7 @@ def train_preprocess(tensors):
     # wav = tf_pitch_shift(wav)
     # wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
+    wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
     wav = tf_add_noise(wav,bg_wav)
     return tf_volume_equalize(wav)
 
@@ -198,8 +199,9 @@ def red_noise(r=0.5):
     red[0] = white[0]
     for i,ele in enumerate(white):
         red[i+1] = r*red[i] + ((1-r**2)**0.5)*white[i+1]
-    return re d
+    return red
 
+# Further improvements: Use combinations of the noises (with varying volume but must volume equalize first) to get even more synthetic sound
 def get_noise(bg_data):
     background_frequency = 0.8
     max_background_volume = 0.1
@@ -213,12 +215,12 @@ def get_noise(bg_data):
             bg_sliced = white_noise()
         else:
             r = np.random.uniform(0.01,0.99)
-            bg_sliced = red_noise(r_)
+            bg_sliced = red_noise(r)
     if np.random.uniform(0,1) < background_frequency:
         bg_volume = np.random.uniform(0,max_background_volume)
     else:
         bg_volume = 0
-    bg_sliced = np.clip(bg_sliced*0.01/np.sqrt(np.mean(bg_sliced**2)),-1.0,1.0)
+    bg_sliced = np.clip(bg_sliced*0.1/np.sqrt(np.mean(bg_sliced**2)),-1.0,1.0)
     return bg_volume*bg_sliced
 
 def reverse(d):
