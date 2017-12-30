@@ -221,7 +221,10 @@ def overdrive_full_bn_reg(features,keep_prob,num_final_neurons,is_training):
     l2_penalty = 0.005
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
-    c = slim_conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3],l2_penalty=l2_penalty)
+    # with the reshape, this will work as a simple thing to ensure mean zero and unit variance spectrogram features
+    c = tf.contrib.slim.batch_norm(fingerprint_4d,is_training=is_training,decay=0.9)
+
+    c = slim_conv2d(c,64,[7,3],is_training,mp=[1,3],l2_penalty=l2_penalty)
     c = slim_conv2d(c,128,[1,7],is_training,mp=[1,4],l2_penalty=l2_penalty)
 
     c = slim_conv2d(c,256,[1,10],is_training,padding="VALID",l2_penalty=l2_penalty)

@@ -205,6 +205,7 @@ def red_noise(r=0.5):
 # Multiply slices together too
 # maybe use combos of 10 of the training samples, all very quiet, to simulate real background conversation
 # maybe increase max_background_volume to 0.2 or 0.3
+# also try adding effects like reverb, echo, flange, phase, etc to words
 def get_noise(bg_data):
     background_frequency = 0.8
     max_background_volume = 0.1
@@ -225,6 +226,10 @@ def get_noise(bg_data):
         bg_sounds.append(bg_sliced)
     combiner = np.random.uniform(0,1)
     if combiner < 0.66:
+        # can try this if model is still not generalizing
+        # sound1_ratio = np.random.uniform(0,1)
+        # sound2_ratio = 1 - sound1_ratio
+        # bg_combined = sound1_ratio*bg_sounds[0] + sound2_ratio*bg_sounds[1]
         bg_combined = bg_sounds[0] + bg_sounds[1]
     else:
         bg_combined = bg_sounds[0]
