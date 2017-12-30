@@ -25,7 +25,7 @@ def load_test_data(sess):
     test_dir = "test/audio"
     test_index = []
     for i,wav_path in enumerate(gfile.Glob("test/audio/*.wav")):
-        if i % 1000 == 0: print("Test {}".format(i))
+        if i % 10000 == 0: print("Test {}".format(i))
         tdata = wav_loader.load(wav_path,sess)
         file_name = os.path.basename(wav_path)
         test_index.append({"file":wav_path,"identifier":file_name,"data":tdata})
