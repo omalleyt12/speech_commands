@@ -32,7 +32,7 @@ style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 200000
-learning_rate = 0.01
+learning_rate = 0.05
 # decay_every = 2000
 decay_rate = 0.10
 sample_rate = 16000 # per sec
@@ -204,7 +204,7 @@ def run_validation(set_name):
 
         pd.DataFrame(pred_df_list).to_csv("predictions_{}.csv".format(set_name))
 
-        return val_acc.calculate()
+        return val_loss.calculate()
 
 
 data_index, unknown_index = load_train_data(style=style)
@@ -220,10 +220,10 @@ is_training_ph = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 
-features = make_features(processed_wavs,is_training_ph,"identity")
+features = make_features(processed_wavs,is_training_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer = medium_resdilate(features,keep_prob,output_neurons,is_training_ph)
+final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,is_training_ph)
 
 loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
 
@@ -245,14 +245,14 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_medres_dropout",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_medres_dropout",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_bn_faster_plus_improvements",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_bn_faster_plus_improvements",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
 sess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
-last_val_accuracy = 0
+last_val_loss = 9999999
 for i in range(steps):
     if i > 0 and i % 500 == 0:
         learning_rate = 0.9*learning_rate
@@ -267,9 +267,9 @@ for i in range(steps):
         sess.run(train_step,feed_dict)
 
     if i % eval_step == 0 or i == (steps - 1):
-        val_acc = run_validation("val")
-        if val_acc < last_val_accuracy:
-            learning_rate = 0.5*learning_rate
+        val_loss = run_validation("val")
+        if val_loss > last_val_loss:
+            learning_rate = 0.1*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
             # print("Restoring former model and rerunning validation")
             # saver.restore(sess,"./model.ckpt")
@@ -277,7 +277,7 @@ for i in range(steps):
         # else:
         #     saver.save(sess,"./model.ckpt")
 
-        last_val_accuracy = val_acc
+        last_val_loss = val_loss
 
     if learning_rate < 0.00001: # at this point, just stop
         saver.save(sess,"./model.ckpt")

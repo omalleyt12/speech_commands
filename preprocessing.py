@@ -17,7 +17,7 @@ def tf_preprocess(wavs,bg_wavs,is_training):
 def train_preprocess(tensors):
     wav = tensors[0]
     bg_wav = tensors[1]
-    wav = tf_pitch_shift(wav)
+    # wav = tf_pitch_shift(wav)
     wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
     wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
