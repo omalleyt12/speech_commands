@@ -22,7 +22,7 @@ def train_preprocess(tensors):
     wav = tf_pad(wav)
     wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
     wav = tf_add_noise(wav,bg_wav)
-    return tf_volume_equalize(wav) # equalize the volume again AFTER adding noise
+    return tf_volume_equalize(wav,vary=True) # equalize the volume again AFTER adding noise
 
 def test_preprocess(wav):
     return tf_volume_equalize(wav)
@@ -74,8 +74,11 @@ def tf_add_noise(wav,bg_wav):
     return wav + bg_wav
 
 
-def tf_volume_equalize(wav):
-    control_vol = tf.convert_to_tensor(0.1,tf.float32)
+def tf_volume_equalize(wav,vary=False):
+    if vary:
+        control_vol = tf.truncated_normal([],0.1,0.01) # since the peak volume strategy I picked isn't perfect
+    else:
+        control_vol = tf.convert_to_tensor(0.1,tf.float32)
     chunks = tf.split(wav,50)
     vols = [tf.sqrt(tf.reduce_mean(tf.pow(chunk,2))) for chunk in chunks]
     vols = tf.stack(vols)
@@ -202,13 +205,14 @@ def red_noise(r=0.5):
     return red
 
 # Further improvements:
+# use the white noise (random uniform) and pink and blue and violet noises provided in the kernel (on your Jupyter now)
 # Multiply slices together too
-# maybe use combos of 10 of the training samples, all very quiet, to simulate real background conversation
-# maybe increase max_background_volume to 0.2 or 0.3
+# maybe use combos of 10 of the training samples, all very quiet, to simulate real background conversation (no, sounds like words still)
+# maybe increase max_background_volume to 0.2 or 0.3 (actually based on how loud bg_data used to be, I changed it to 0.6)
 # also try adding effects like reverb, echo, flange, phase, etc to words
 def get_noise(bg_data):
     background_frequency = 0.8
-    max_background_volume = 0.1
+    max_background_volume = 0.6
     bg_sounds = []
     for _ in range(2):
         if np.random.uniform(0,1) < 0.5: # use regular background noise
@@ -227,10 +231,10 @@ def get_noise(bg_data):
     combiner = np.random.uniform(0,1)
     if combiner < 0.66:
         # can try this if model is still not generalizing
-        # sound1_ratio = np.random.uniform(0,1)
-        # sound2_ratio = 1 - sound1_ratio
-        # bg_combined = sound1_ratio*bg_sounds[0] + sound2_ratio*bg_sounds[1]
-        bg_combined = bg_sounds[0] + bg_sounds[1]
+        sound1_ratio = np.random.uniform(0,1)
+        sound2_ratio = 1 - sound1_ratio
+        bg_combined = sound1_ratio*bg_sounds[0] + sound2_ratio*bg_sounds[1]
+        # bg_combined = bg_sounds[0] + bg_sounds[1]
     else:
         bg_combined = bg_sounds[0]
     bg_combined = np.clip(bg_combined*0.1/np.sqrt(np.mean(bg_combined**2)),-1.0,1.0)
