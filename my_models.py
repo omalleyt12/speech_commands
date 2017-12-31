@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow.contrib.slim as slim
 import custom_bn as bn
 from keras.layers import GlobalMaxPool2D
 
@@ -245,7 +246,49 @@ def overdrive_full_bn_reg(features,keep_prob,num_final_neurons,is_training):
     return final_layer, fc
 
 
-# def newdrive(features,keep_prob,num_final_neurons,is_training):
+def newdrive(features,keep_prob,num_final_neurons,is_training):
+    f = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+    f = slim.batch_norm(f,is_training=is_training,decay=0.9)
+    print(f.shape)
+
+    c = slim.conv2d(f,16,[7,1],activation_fn=None)
+    c = slim.batch_norm(c,is_training=is_training,decay=0.9)
+    c = tf.nn.relu(c)
+    print(c.shape)
+
+    c = slim.separable_conv2d(c,32,[1,7],1,activation_fn=None)
+    c = slim.batch_norm(c,is_training=is_training,decay=0.9)
+    c = tf.nn.relu(c)
+    c = tf.nn.max_pool(c,[1,1,3,1],[1,1,3,1],"VALID")
+    print(c.shape)
+
+    c = slim.separable_conv2d(c,64,[1,7],1,activation_fn=None)
+    c = slim.batch_norm(c,is_training=is_training,decay=0.9)
+    c = tf.nn.relu(c)
+    c = tf.nn.max_pool(c,[1,1,4,1],[1,1,4,1],"VALID")
+    print(c.shape)
+
+    c = slim.separable_conv2d(c,128,[1,10],1,activation_fn=None,padding="VALID")
+    c = slim.batch_norm(c,is_training=is_training,decay=0.9)
+    c = tf.nn.relu(c)
+    print(c.shape)
+
+    c = slim.separable_conv2d(c,256,[7,1],1,activation_fn=None)
+    c = slim.batch_norm(c,is_training=is_training,decay=0.9)
+    c = tf.nn.relu(c)
+    c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
+    print(c.shape)
+
+    fc = slim.fully_connected(c,128,activation_fn=None,weights_regularizer=slim.l2_regularizer(0.001))
+    fc = slim.batch_norm(fc,is_training=is_training,decay=0.9)
+    fc = tf.nn.relu(fc)
+    print(fc.shape)
+
+    final_layer = slim.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(final_layer.shape)
+
+    return final_layer, fc
+
 
 
 
