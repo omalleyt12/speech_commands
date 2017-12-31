@@ -218,7 +218,7 @@ def slim_conv2d(input_channel,channels,kernel_size,is_training,padding="SAME",mp
 
 def overdrive_full_bn_reg(features,keep_prob,num_final_neurons,is_training):
     """A fully, correctly Batch Normalized network with weight penalties and dropout and a larger FC layer"""
-    l2_penalty = 0.005
+    l2_penalty = 0.0005
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
     # with the reshape, this will work as a simple thing to ensure mean zero and unit variance spectrogram features
@@ -353,12 +353,12 @@ def medium_resdilate(features,keep_prob,num_final_neurons,is_training):
         This allows x to pass freely through the dilation convolutions (one at the moment)
         Based on ideas from WaveNet and "Identity Mappings in Deep Residual Networks"
         """
-        x = tf.contrib.slim.conv2d(input_layer,channels,[7,1],activation_fn=None)
+        x = tf.contrib.slim.conv2d(input_layer,channels,[9,1],activation_fn=None)
         c = x
-        for dilations in [2,4]:
+        for dilations in [2,4,8]:
             c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
             c = tf.nn.relu(c)
-            c = tf.contrib.slim.conv2d(c,channels,[7,1],rate=[2,1],activation_fn=None)
+            c = tf.contrib.slim.conv2d(c,channels,[9,1],rate=[2,1],activation_fn=None)
         res = x + c
         res = tf.contrib.slim.batch_norm(res,is_training=is_training,decay=0.9)
         res = tf.nn.relu(res)
@@ -367,19 +367,19 @@ def medium_resdilate(features,keep_prob,num_final_neurons,is_training):
 
     c = tf.reshape(features,[-1,features.shape[1],1,1])
     c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
-    for channels in [16,32,64,128,256]:
+    for channels in [16,32,64,128,256,512]:
         c = cool_layer_bn(c,channels,str(channels),is_training)
         print(c.shape)
     c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
     print(c.shape)
     c = tf.contrib.layers.flatten(c)
-    # c = tf.nn.dropout(c,keep_prob)
+    c = tf.nn.dropout(c,keep_prob)
     print(c.shape)
 
-    fc = tf.contrib.slim.fully_connected(c,256,activation_fn=None)
+    fc = tf.contrib.slim.fully_connected(c,256,activation_fn=None,weights_regularizer=tf.contrib.slim.l2_regularizer(0.0001))
     fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
     fc = tf.nn.relu(fc)
-    # fc = tf.nn.dropout(fc,keep_prob)
+    fc = tf.nn.dropout(fc,keep_prob)
     print(fc.shape)
 
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)

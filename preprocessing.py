@@ -17,12 +17,12 @@ def tf_preprocess(wavs,bg_wavs,is_training):
 def train_preprocess(tensors):
     wav = tensors[0]
     bg_wav = tensors[1]
-    # wav = tf_pitch_shift(wav)
+    wav = tf_pitch_shift(wav)
     wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
     wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
     wav = tf_add_noise(wav,bg_wav)
-    return tf_volume_equalize(wav,vary=True) # equalize the volume again AFTER adding noise
+    return tf_volume_equalize(wav) # equalize the volume again AFTER adding noise
 
 def test_preprocess(wav):
     return tf_volume_equalize(wav)
@@ -208,11 +208,11 @@ def red_noise(r=0.5):
 # use the white noise (random uniform) and pink and blue and violet noises provided in the kernel (on your Jupyter now)
 # Multiply slices together too
 # maybe use combos of 10 of the training samples, all very quiet, to simulate real background conversation (no, sounds like words still)
-# maybe increase max_background_volume to 0.2 or 0.3 (actually based on how loud bg_data used to be, I changed it to 0.6)
+# adjust optimal background volume
 # also try adding effects like reverb, echo, flange, phase, etc to words
 def get_noise(bg_data):
     background_frequency = 0.8
-    max_background_volume = 0.6
+    max_background_volume = 0.3
     bg_sounds = []
     for _ in range(2):
         if np.random.uniform(0,1) < 0.5: # use regular background noise
