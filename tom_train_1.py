@@ -33,7 +33,7 @@ style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 200000
-learning_rate = 0.01
+learning_rate = 1e-9
 # decay_every = 2000
 decay_rate = 0.10
 sample_rate = 16000 # per sec
@@ -250,6 +250,8 @@ features = make_features(processed_wavs,is_training_ph,"log-mel")
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 final_layer, open_max_layer = newdrive(features,keep_prob,output_neurons,is_training_ph)
 
+probabilities = tf.nn.softmax(final_layer)
+
 loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
 
 total_loss = tf.losses.get_total_loss()
@@ -316,10 +318,22 @@ import pandas as pd
 df = pd.DataFrame([],columns=["fname","label"])
 offset = 0
 test_batch_size = batch_size
+test_info = []
 while offset < len(test_index):
+    print(offset)
     feed_dict = get_batch(test_index,test_batch_size,offset=offset,mode="comp",style=style)
     feed_dict.update({ keep_prob:1.0,is_training_ph:False})
-    test_pred = sess.run(predictions,feed_dict=feed_dict)
+    test_av, test_prob, test_pred = sess.run([open_max_layer,probabilities,predictions],feed_dict=feed_dict)
+
+    # compute and save distances and MR models probabilities
+    for e,p in enumerate(test_pred):
+        cos_dist = spd.cosine(test_av[e],MAVs[p])
+        unknown_prob = MR_MODELS[p].w_score(cos_dist)
+        class_prob = test_prob[e]
+        fname = test_index[offset + e]["identifier"]
+        test_info.append({"MAV_distance":cos_dist,"MAV_prob":unknown_prob,"Class_Prob":class_prob,"Class_Guess":p,"File":fname})
+
+
     test_labels = [all_words[test_index] for test_index in test_pred]
     for i in range(len(test_labels)):
         if test_labels[i] not in wanted_words:
@@ -329,7 +343,7 @@ while offset < len(test_index):
     offset += test_batch_size
     df = pd.concat([df,test_batch_df])
 df.to_csv("my_guesses_3.csv",index=False)
-
+pd.DataFrame(test_info).to_csv("test_mav_info.csv")
 sess.close()
 
 from twilio.rest import Client

@@ -12,7 +12,9 @@ window_stride_samples = 10 * 16
 def make_features(wavs,is_training,name="log-mel"):
     if name == "log-mel":
         print("Features: Log Mel")
-        return make_vtlp_mels(wavs,is_training)
+        return make_vtlp_mels(wavs,is_training,bins=128)
+    elif name == "log-mel-40":
+        return make_vtlp_mels(wavs,is_training,bins=40)
     elif name == "mfcc":
         print("Features: MFCC")
         return make_mfccs(wavs)
@@ -39,14 +41,14 @@ def make_log_mel_fb(sig,name=None):
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
         return log_mel_spectrograms
 
-def make_vtlp_mels(sig,is_training,name=None):
+def make_vtlp_mels(sig,is_training,name=None,bins=128):
     """A limitation with this approach is that the VTLP factor is the same within a batch"""
     with tf.name_scope(name,"audio_processing",[sig]) as scope:
         stfts = tf.contrib.signal.stft(sig, frame_length=window_size_samples, frame_step=window_stride_samples,fft_length=1024)
         magnitude_spectrograms = tf.abs(stfts)
         # Warp the linear-scale, magnitude spectrograms into the mel-scale.
         num_spectrogram_bins = magnitude_spectrograms.shape[-1].value
-        lower_edge_hertz, upper_edge_hertz, num_mel_bins = 0.0, 7600.0, 128
+        lower_edge_hertz, upper_edge_hertz, num_mel_bins = 0.0, 7600.0, bins
         linear_to_mel_weight_matrix = mel_matrix.linear_to_mel_weight_matrix(
           num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz,
             upper_edge_hertz,is_training)
