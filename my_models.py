@@ -245,6 +245,17 @@ def overdrive_full_bn_reg(features,keep_prob,num_final_neurons,is_training):
     print(c.shape)
     return final_layer, fc
 
+def newsmallmels(features,keep_prob,num_final_neurons,is_training):
+    f = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+    f = slim.batch_norm(f,is_training=is_training,decay=0.9)
+    print(f.shape)
+
+    c = slim.conv2d(f,64,[10,4],activation_fn=None)
+    c = slim.batch_norm(c,is_training=is_training,decay=0.9)
+    c = tf.nn.relu(c)
+    c = tf.nn.avg_pool(c,[1,1,2,1],[1,1,2,1],"VALID")
+    print(c.shape)
+
 
 def newdrive(features,keep_prob,num_final_neurons,is_training):
     f = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
@@ -440,23 +451,23 @@ def separable_resdilate(features,keep_prob,num_final_neurons,is_training):
         """
         Combine the ideas from WaveNet and ResNet with Xception-like depthwise separable convolutions
         """
-        x = tf.contrib.slim.separable_conv2d(input_layer,num_outputs=channels,stride=1,depth_multiplier=1,kernel_size=[5,1],activation_fn=None)
+        x = tf.contrib.slim.separable_conv2d(input_layer,num_outputs=channels,stride=1,depth_multiplier=1,kernel_size=[9,1],activation_fn=None)
         c = x
-        for dilation in [2,4]:
+        for dilation in [2,4,8]:
             c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
             c = tf.nn.relu(c)
-            c = tf.contrib.slim.separable_conv2d(c,num_outputs=channels,stride=1,depth_multiplier=1,kernel_size=[5,1],rate=[dilation,1],activation_fn=None)
+            c = tf.contrib.slim.separable_conv2d(c,num_outputs=channels,stride=1,depth_multiplier=1,kernel_size=[9,1],rate=[dilation,1],activation_fn=None)
         res = x + c
         res = tf.nn.relu(res)
-        mp = tf.nn.avg_pool(res,[1,3,1,1],[1,3,1,1],"VALID")
+        mp = tf.nn.max_pool(res,[1,3,1,1],[1,3,1,1],"VALID")
         return mp
 
     c = tf.reshape(features,[-1,features.shape[1],1,1])
     c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
-    for channels in [4,8,16,32,64,128]:
+    for channels in [8,16,32,64,128,256]:
         c = cool_layer_bn(c,channels,str(channels),is_training)
         print(c.shape)
-    c = tf.nn.avg_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
+    c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
     c = tf.contrib.layers.flatten(c)
     print(c.shape)
 
