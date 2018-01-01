@@ -9,16 +9,20 @@ sample_rate = 16000
 
 
 def tf_preprocess(wavs,bg_wavs,is_training):
-    return tf.cond(is_training,
-                   lambda: tf.map_fn(train_preprocess,[wavs,bg_wavs],parallel_iterations=120,dtype=tf.float32),
-                   lambda: tf.map_fn(test_preprocess,wavs,parallel_iterations=120)
-    )
+    def training_process(wavs,bg_wavs):
+        # time stretch half the time, pitch shift the other half (all batch-wise, bc that makes the batch time 20x faster)
+        augmentation_picker = tf.random_uniform([],0,1)
+        augmented_wavs = tf.cond(tf.less(augmentation_picker,0.5),lambda: tf_batch_time_stretch(wavs),lambda: tf_batch_pitch_shift(wavs))
+        return tf.map_fn(train_preprocess,[wavs,bg_wavs],parallel_iterations=120,dtype=tf.float32,back_prop=False)
+
+    def testing_process(wavs):
+        return tf.map_fn(test_preprocess,wavs,parallel_iterations=120,back_prop=False)
+
+    return tf.cond(is_training,lambda: training_process(wavs,bg_wavs), lambda: testing_process(wavs))
 
 def train_preprocess(tensors):
     wav = tensors[0]
     bg_wav = tensors[1]
-    wav = tf_pitch_shift(wav)
-    wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
     wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
     wav = tf_add_noise(wav,bg_wav)
@@ -28,7 +32,7 @@ def test_preprocess(wav):
     return tf_volume_equalize(wav)
 
 def tf_pitch_shift(wav):
-    pitch = tf.truncated_normal([],0,5)
+    pitch = tf.truncated_normal([],0,3)
     frame_length = 300
     frame_step_in = int(0.25 * 300)
     resample_x = 2**(pitch/12)
@@ -36,6 +40,16 @@ def tf_pitch_shift(wav):
     s = tf.contrib.signal.stft(wav,frame_length,frame_step_in)
     a = tf.contrib.signal.inverse_stft(s,frame_length,frame_step_out)
     return tf_resample(a)
+
+def tf_batch_pitch_shift(wav):
+    pitch = tf.truncated_normal([],0,5)
+    frame_length = 300
+    frame_step_in = int(0.25 * 300)
+    resample_x = 2**(pitch/12)
+    frame_step_out = tf.cast(frame_step_in*resample_x,tf.int32)
+    s = tf.contrib.signal.stft(wav,frame_length,frame_step_in)
+    a = tf.contrib.signal.inverse_stft(s,frame_length,frame_step_out)
+    return tf.map_fn(tf_resample,a,parallel_iterations=120,back_prop=False)
 
 def tf_time_stretch(wav):
     speedx = tf.truncated_normal([],1,0.2)
@@ -45,6 +59,15 @@ def tf_time_stretch(wav):
     s = tf.contrib.signal.stft(wav,frame_length,frame_step_in)
     a = tf.contrib.signal.inverse_stft(s,frame_length,frame_step_out)
     return tf_get_word(a,16000)
+
+def tf_batch_time_stretch(wavs):
+    speedx = tf.truncated_normal([],1,0.2)
+    frame_length = 300
+    frame_step_in = int(0.25 * 300)
+    frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)
+    s = tf.contrib.signal.stft(wavs,frame_length,frame_step_in)
+    a = tf.contrib.signal.inverse_stft(s,frame_length,frame_step_out)
+    return tf.map_fn(tf_get_word,wavs,parallel_iterations=120,back_prop=False)
 
 def tf_get_word(wav,size=16000):
     frames = shape_ops.frame(wav,size,300,pad_end=True)
@@ -212,7 +235,7 @@ def red_noise(r=0.5):
 # also try adding effects like reverb, echo, flange, phase, etc to words
 def get_noise(bg_data):
     background_frequency = 0.8
-    max_background_volume = 0.5
+    max_background_volume = 0.1
     bg_sounds = []
     for _ in range(2):
         if np.random.uniform(0,1) < 0.5: # use regular background noise

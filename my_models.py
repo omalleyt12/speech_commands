@@ -192,7 +192,6 @@ def overdrive_bn(features,keep_prob,num_final_neurons,is_training):
 
 def overdrive_full_bn(features,keep_prob,num_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
-    fingerprint_4d = tf.contrib.slim.batch_norm(fingerprint_4d,is_training=is_training,decay=0.9)
 
     c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
     c = conv2d(c,128,[1,7],is_training,mp=[1,4])
@@ -259,7 +258,6 @@ def newsmallmels(features,keep_prob,num_final_neurons,is_training):
 
 def newdrive(features,keep_prob,num_final_neurons,is_training):
     f = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
-    f = slim.batch_norm(f,is_training=is_training,decay=0.9)
     print(f.shape)
 
     c = slim.conv2d(f,16,[7,1],activation_fn=None)
@@ -415,7 +413,7 @@ def medium_resdilate(features,keep_prob,num_final_neurons,is_training):
         """
         x = tf.contrib.slim.conv2d(input_layer,channels,[9,1],activation_fn=None)
         c = x
-        for dilation in [2,4,8]:
+        for dilation in [2,4]:
             c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
             c = tf.nn.relu(c)
             c = tf.contrib.slim.conv2d(c,channels,[9,1],rate=[dilation,1],activation_fn=None,weights_regularizer=slim.l2_regularizer(0.005))
@@ -428,7 +426,7 @@ def medium_resdilate(features,keep_prob,num_final_neurons,is_training):
 
     c = tf.reshape(features,[-1,features.shape[1],1,1])
     c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
-    for channels in [8,32,32,64,126,256]:
+    for channels in [8,16,32,64,126,256]:
         c = cool_layer_bn(c,channels,str(channels),is_training)
         print(c.shape)
     c = tf.nn.avg_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
