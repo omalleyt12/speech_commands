@@ -2,6 +2,7 @@ wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","
 all_words = wanted_words + ["bed","bird","cat","dog","eight","five","four","happy","house","marvin","nine","one","seven","sheila","six","three","tree","two","wow","zero","true_unknown"]
 all_words_index = {w:i for i,w in enumerate(all_words)}
 
+import pickle
 import libmr
 import scipy.spatial.distance as spd
 import pandas as pd
@@ -202,7 +203,10 @@ def run_validation(set_name,step):
             if set_name == "train":
                 for i,p in enumerate(val_pred):
                     if val_correct[i]:
-                        AVs[p].append(open_max[i,:])
+                        # only care about the direction of the unit-normed vector
+                        open_max_vector = open_max[i,:]
+                        normed_open_max_vector = open_max_vector/np.linalg.norm(open_max_vector)
+                        AVs[p].append(normed_open_max_vector)
         if set_name == "train":
             MAVs = {}
             DAVs = defaultdict(list)
@@ -215,6 +219,14 @@ def run_validation(set_name,step):
                 biggest_true_distances = sorted(DAVs[c])[-20:]
                 mr.fit_high(biggest_true_distances,len(biggest_true_distances))
                 MR_MODELS[c] = mr
+            with open("MAVs.pickle","wb") as f:
+                pickle.dump(MAVs,f)
+            with open("AVs.pickle","wb") as f:
+                pickle.dump(AVs,f)
+            with open("DAVs.pickle","wb") as f:
+                pickle.dump(DAVs,f)
+            with open("MR_MODELS.pickle","wb") as f:
+                pickle.dump(MR_MODELS,f)
 
 
 
@@ -272,8 +284,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_big_resdilate_much_dropout",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_big_resdilate_much_dropout",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_full_bn_80_keep",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_full_bn_80_keep",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -284,7 +296,7 @@ for i in range(steps):
     if i > 0 and i % 500 == 0:
         learning_rate = 0.9*learning_rate
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
-    feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate,is_training_ph: True})
+    feed_dict.update({keep_prob: 0.8,learning_rate_ph:learning_rate,is_training_ph: True})
     # now here's where we run the real, convnet part
     if i % 10 == 0:
         _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
@@ -308,9 +320,9 @@ for i in range(steps):
 
     if learning_rate < 0.00001: # at this point, just stop
         saver.save(sess,"./model.ckpt")
-        test_loss, test_acc = run_validation("test",i)
-        MAVs, MR_MODELS = run_validation("train",i)
         break
+test_loss, test_acc = run_validation("test",i)
+MAVs, MR_MODELS = run_validation("train",i)
 
 test_index = wl.load_test_data(sess)
 # now here's where we run the test classification
@@ -329,7 +341,7 @@ while offset < len(test_index):
     for e,p in enumerate(test_pred):
         cos_dist = spd.cosine(test_av[e],MAVs[p])
         unknown_prob = MR_MODELS[p].w_score(cos_dist)
-        class_prob = test_prob[e]
+        class_prob = test_prob[e].max()
         fname = test_index[offset + e]["identifier"]
         test_info.append({"MAV_distance":cos_dist,"MAV_prob":unknown_prob,"Class_Prob":class_prob,"Class_Guess":p,"File":fname})
 
