@@ -418,33 +418,34 @@ def medium_resdilate(features,keep_prob,num_final_neurons,is_training):
         for dilation in [2,4,8]:
             c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
             c = tf.nn.relu(c)
-            c = tf.contrib.slim.conv2d(c,channels,[9,1],rate=[dilation,1],activation_fn=None)
+            c = tf.contrib.slim.conv2d(c,channels,[9,1],rate=[dilation,1],activation_fn=None,weights_regularizer=slim.l2_regularizer(0.005))
         res = x + c
         res = tf.contrib.slim.batch_norm(res,is_training=is_training,decay=0.9)
         res = tf.nn.relu(res)
-        mp = tf.nn.avg_pool(res,[1,3,1,1],[1,3,1,1],"VALID")
+        res = tf.nn.dropout(res,keep_prob)
+        mp = tf.nn.max_pool(res,[1,3,1,1],[1,3,1,1],"VALID")
         return mp
 
     c = tf.reshape(features,[-1,features.shape[1],1,1])
     c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
-    for channels in [8,16,32,64,126,256]:
+    for channels in [8,32,32,64,126,256]:
         c = cool_layer_bn(c,channels,str(channels),is_training)
         print(c.shape)
     c = tf.nn.avg_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
     print(c.shape)
     c = tf.contrib.layers.flatten(c)
-    # c = tf.nn.dropout(c,keep_prob)
+    c = tf.nn.dropout(c,keep_prob)
     print(c.shape)
 
-    fc = tf.contrib.slim.fully_connected(c,128,activation_fn=None,weights_regularizer=tf.contrib.slim.l2_regularizer(0.0005))
+    fc = tf.contrib.slim.fully_connected(c,256,activation_fn=None,weights_regularizer=tf.contrib.slim.l2_regularizer(0.005))
     fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
     fc = tf.nn.relu(fc)
-    # fc = tf.nn.dropout(fc,keep_prob)
+    fc = tf.nn.dropout(fc,keep_prob)
     print(fc.shape)
 
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
     print(final_layer.shape)
-    return final_layer
+    return final_layer, fc
 
 def separable_resdilate(features,keep_prob,num_final_neurons,is_training):
     def cool_layer_bn(input_layer,channels,scope,is_training,first=False):
