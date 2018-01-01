@@ -245,10 +245,10 @@ is_training_ph = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 
-features = make_features(processed_wavs,is_training_ph,"log-mel")
+features = make_features(processed_wavs,is_training_ph,"identity")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer, open_max_layer = newdrive(features,keep_prob,output_neurons,is_training_ph)
+final_layer, open_max_layer = medium_resdilate(features,keep_prob,output_neurons,is_training_ph)
 
 probabilities = tf.nn.softmax(final_layer)
 
@@ -272,8 +272,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_bn_fastest_plus_improvements",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_bn_fastest_plus_improvements",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_big_resdilate_much_dropout",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_big_resdilate_much_dropout",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)

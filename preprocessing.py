@@ -17,7 +17,7 @@ def tf_preprocess(wavs,bg_wavs,is_training):
 def train_preprocess(tensors):
     wav = tensors[0]
     bg_wav = tensors[1]
-    # wav = tf_pitch_shift(wav)
+    wav = tf_pitch_shift(wav)
     wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
     wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
@@ -212,7 +212,7 @@ def red_noise(r=0.5):
 # also try adding effects like reverb, echo, flange, phase, etc to words
 def get_noise(bg_data):
     background_frequency = 0.8
-    max_background_volume = 0.3
+    max_background_volume = 0.5
     bg_sounds = []
     for _ in range(2):
         if np.random.uniform(0,1) < 0.5: # use regular background noise
