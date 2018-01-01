@@ -32,8 +32,8 @@ def play(a):
 style = "unknown"
 batch_size = 100
 eval_step = 500
-steps = 200000
-learning_rate = 1e-9
+steps = 1000
+learning_rate = 0.01
 # decay_every = 2000
 decay_rate = 0.10
 sample_rate = 16000 # per sec
@@ -245,10 +245,10 @@ is_training_ph = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 
-features = make_features(processed_wavs,is_training_ph,"identity")
+features = make_features(processed_wavs,is_training_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer, open_max_layer = medium_resdilate(features,keep_prob,output_neurons,is_training_ph)
+final_layer, open_max_layer = newdrive(features,keep_prob,output_neurons,is_training_ph)
 
 probabilities = tf.nn.softmax(final_layer)
 
