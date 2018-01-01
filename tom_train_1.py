@@ -2,6 +2,8 @@ wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","
 all_words = wanted_words + ["bed","bird","cat","dog","eight","five","four","happy","house","marvin","nine","one","seven","sheila","six","three","tree","two","wow","zero","true_unknown"]
 all_words_index = {w:i for i,w in enumerate(all_words)}
 
+import libmr
+import scipy.spatial.distance as spd
 import pandas as pd
 import re
 import math
@@ -31,7 +33,7 @@ style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 200000
-learning_rate = 0.2
+learning_rate = 0.01
 # decay_every = 2000
 decay_rate = 0.10
 sample_rate = 16000 # per sec
@@ -155,7 +157,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         feed_dict[labels_ph] = np.stack(labels).astype(np.int32)
     return feed_dict
 
-def run_validation(set_name):
+def run_validation(set_name,step):
         if set_name == "train":
             from collections import defaultdict
             AVs = defaultdict(list)
@@ -168,8 +170,8 @@ def run_validation(set_name):
         while val_offset < val_size:
             feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
             feed_dict.update({keep_prob:1.0,is_training_ph:False})
-            open_max, val_pred,val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([open_max_layer,predictions,merged_summaries,accuracy_tensor,loss_mean,confusion_matrix],feed_dict)
-            val_writer.add_summary(val_sum_val,i)
+            open_max, val_correct, val_pred,val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([open_max_layer,is_correct,predictions,merged_summaries,accuracy_tensor,loss_mean,confusion_matrix],feed_dict)
+            val_writer.add_summary(val_sum_val,step)
             val_acc.add(val_acc_val)
             val_loss.add(val_loss_val)
             val_conf_mat += val_conf_mat_val
@@ -199,22 +201,35 @@ def run_validation(set_name):
                 })
             if set_name == "train":
                 for i,p in enumerate(val_pred):
-                    AVs[p] += open_max[i,:]
+                    if val_correct[i]:
+                        AVs[p].append(open_max[i,:])
         if set_name == "train":
+            MAVs = {}
+            DAVs = defaultdict(list)
+            MR_MODELS = {}
             for c in AVs.keys():
-                MAVs = {}
                 MAVs[c] = np.stack(AVs[c]).mean(axis=0)
+                for v in AVs[c]:
+                    DAVs[c].append(spd.cosine(v,MAVs[c]))
+                mr = libmr.MR()
+                biggest_true_distances = sorted(DAVs[c])[-20:]
+                mr.fit_high(biggest_true_distances,len(biggest_true_distances))
+                MR_MODELS[c] = mr
 
 
 
-        tf.logging.info("{} Step {} LR {} Accuracy {} Loss {}".format(set_name,i,learning_rate,val_acc,val_loss))
+
+        tf.logging.info("{} Step {} LR {} Accuracy {} Loss {}".format(set_name,step,learning_rate,val_acc,val_loss))
         df_words = all_words if style == "full" else wanted_words
 
         pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(set_name))
 
         pd.DataFrame(pred_df_list).to_csv("predictions_{}.csv".format(set_name))
 
-        return val_loss.calculate()
+        if set_name == "train":
+            return MAVs, MR_MODELS
+        else:
+            return val_loss.calculate(), val_acc.calculate()
 
 
 data_index, unknown_index = load_train_data(style=style)
@@ -233,7 +248,7 @@ processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 features = make_features(processed_wavs,is_training_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,is_training_ph)
+final_layer, open_max_layer = newdrive(features,keep_prob,output_neurons,is_training_ph)
 
 loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
 
@@ -265,7 +280,7 @@ saver = tf.train.Saver()
 last_val_loss = 9999999
 for i in range(steps):
     if i > 0 and i % 500 == 0:
-        learning_rate = 0.5*learning_rate
+        learning_rate = 0.9*learning_rate
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
     feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate,is_training_ph: True})
     # now here's where we run the real, convnet part
@@ -277,22 +292,22 @@ for i in range(steps):
         sess.run(train_step,feed_dict)
 
     if i % eval_step == 0 or i == (steps - 1):
-        val_loss = run_validation("val")
+        val_loss, val_acc = run_validation("val",i)
         if val_loss > last_val_loss:
-            learning_rate = 0.1*learning_rate
+            learning_rate = 0.75*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
             # print("Restoring former model and rerunning validation")
             # saver.restore(sess,"./model.ckpt")
-            # val_acc = run_validation("val")
+            # val_acc = run_validation("val",i)
         # else:
         #     saver.save(sess,"./model.ckpt")
 
         last_val_loss = val_loss
 
-    if learning_rate < 0.0001: # at this point, just stop
+    if learning_rate < 0.00001: # at this point, just stop
         saver.save(sess,"./model.ckpt")
-        test_acc = run_validation("test")
-        train_acc = run_validation("train")
+        test_loss, test_acc = run_validation("test",i)
+        MAVs, MR_MODELS = run_validation("train",i)
         break
 
 test_index = wl.load_test_data(sess)
@@ -324,11 +339,11 @@ account_sid = "AC7ef9b2470e5800d2cf47640564e18f3f"
 # Your Auth Token from twilio.com/console
 auth_token  = "e36bb44f5528a0bcbe45509b113d9469"
 
-# client = Client(account_sid, auth_token)
-# message = client.messages.create(
-#     to="+19082682005",
-#     from_="+12673607895",
-#     body="Model finished running with {} validation accuracy".format(val_acc))
+client = Client(account_sid, auth_token)
+message = client.messages.create(
+    to="+19082682005",
+    from_="+12673607895",
+    body="Model finished running with {} val accuracy".format(val_acc)) 
 
-# print(message.sid)
+print(message.sid)
 
