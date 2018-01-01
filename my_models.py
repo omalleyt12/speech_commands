@@ -277,6 +277,7 @@ def newdrive(features,keep_prob,num_final_neurons,is_training):
     c = slim.batch_norm(c,is_training=is_training,decay=0.9)
     c = tf.nn.relu(c)
     c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
+    c = tf.contrib.layers.flatten(c)
     print(c.shape)
 
     fc = slim.fully_connected(c,128,activation_fn=None,weights_regularizer=slim.l2_regularizer(0.001))
