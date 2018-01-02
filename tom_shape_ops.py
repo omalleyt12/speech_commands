@@ -94,10 +94,10 @@ def frame(signal, frame_length, frame_step, pad_end=False, pad_value=0, axis=-1,
     frame_step = ops.convert_to_tensor(frame_step, name="frame_step")
     axis = ops.convert_to_tensor(axis, name="axis")
 
-    signal.shape.with_rank_at_least(1)
-    frame_length.shape.assert_has_rank(0)
-    frame_step.shape.assert_has_rank(0)
-    axis.shape.assert_has_rank(0)
+    # signal.shape.with_rank_at_least(1)
+    # frame_length.shape.assert_has_rank(0)
+    # frame_step.shape.assert_has_rank(0)
+    # axis.shape.assert_has_rank(0)
 
     result_shape = _infer_frame_shape(signal, frame_length, frame_step, pad_end,
                                       axis)
@@ -116,7 +116,7 @@ def frame(signal, frame_length, frame_step, pad_end=False, pad_value=0, axis=-1,
     # If padding is requested, pad the input signal tensor with pad_value.
     if pad_end:
       pad_value = ops.convert_to_tensor(pad_value, signal.dtype)
-      pad_value.shape.assert_has_rank(0)
+      # pad_value.shape.assert_has_rank(0)
 
       # Calculate number of frames, using double negatives to round up.
       num_frames = -(-length_samples // frame_step)

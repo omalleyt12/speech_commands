@@ -4,15 +4,16 @@ import numpy as np
 import scipy as sp
 from toolz.functoolz import memoize
 from tensorflow.contrib.signal.python.ops import shape_ops
+from tensorflow.contrib.signal.python.ops import reconstruction_ops
+from tensorflow.contrib.signal.python.ops import window_ops
 
 sample_rate = 16000
 
 
 def tf_preprocess(wavs,bg_wavs,is_training):
     def training_process(wavs,bg_wavs):
-        # time stretch half the time, pitch shift the other half (all batch-wise, bc that makes the batch time 20x faster)
-        # augmentation_picker = tf.random_uniform([],0,1)
-        # augmented_wavs = tf.cond(tf.less(augmentation_picker,0.5),lambda: tf_batch_time_stretch(wavs),lambda: tf_batch_pitch_shift(wavs))
+        # wavs = fast_pitch_shift(wavs)
+        wavs = fast_time_stretch(wavs)
         return tf.map_fn(train_preprocess,[wavs,bg_wavs],parallel_iterations=120,dtype=tf.float32,back_prop=False)
 
     def testing_process(wavs):
@@ -24,7 +25,7 @@ def train_preprocess(tensors):
     wav = tensors[0]
     bg_wav = tensors[1]
     # wav = tf_pitch_shift(wav)
-    wav = tf_time_stretch(wav)
+    # wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
     wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
     wav = tf_add_noise(wav,bg_wav)
@@ -32,6 +33,37 @@ def train_preprocess(tensors):
 
 def test_preprocess(wav):
     return tf_volume_equalize(wav)
+
+def fast_time_stretch(signals):
+    def overlap(tup):
+        framed_signals, frame_step_out = tup
+        new_wav = reconstruction_ops.overlap_and_add(framed_signals,frame_step_out)
+        return tf_get_word(new_wav)
+
+    speedx = tf.random_uniform([tf.shape(signals)[0]],0.7,1.3)
+    frame_length = 300
+    frame_step_in = int(300*0.25)
+    frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)
+    hann_window = window_ops.hann_window(frame_length)
+    framed_signals = shape_ops.frame(signals, frame_length, frame_step_in,pad_end=False)
+    framed_signals *= hann_window
+    return tf.map_fn(overlap,[framed_signals,frame_step_out],parallel_iterations=120,back_prop=False,dtype=tf.float32,infer_shape=False)
+
+def fast_pitch_shift(signals):
+    def resample(tup):
+        framed_signals, frame_step_out = tup
+        new_wav = reconstruction_ops.overlap_and_add(framed_signals,frame_step_out)
+        return tf_resample(new_wav)
+
+    pitch = tf.random_uniform([tf.shape(signals)[0]],-3,3)
+    frame_length = 300
+    frame_step_in = int(300*0.25)
+    resample_x = 2**(pitch/12)
+    frame_step_out = tf.cast(frame_step_in*resample_x,tf.int32)
+    hann_window = window_ops.hann_window(frame_length)
+    framed_signals = shape_ops.frame(signals, frame_length, frame_step_in,pad_end=False)
+    framed_signals *= hann_window
+    return tf.map_fn(resample,[framed_signals,frame_step_out],parallel_iterations=120,back_prop=False,dtype=tf.float32,infer_shape=False)
 
 def tf_pitch_shift(wav):
     pitch = tf.truncated_normal([],0,3)
@@ -72,7 +104,7 @@ def tf_batch_time_stretch(wavs):
     return tf.map_fn(tf_get_word,wavs,parallel_iterations=120,back_prop=False)
 
 def tf_get_word(wav,size=16000):
-    frames = shape_ops.frame(wav,size,300,pad_end=True)
+    frames = shape_ops.frame(wav,size,1000,pad_end=True)
     frame_stack = tf.stack(frames)
     frame_vols = tf.reduce_mean(tf.pow(frame_stack,2),axis=1)
     max_frame_vol = tf.argmax(frame_vols)
@@ -216,7 +248,6 @@ def pad(wav):
 #         b = np.pad(d,(0,-pad_num),mode="constant")[-pad_num:]
 #     return b
 
-# still have to normalize the level of the noise (50x too high)
 def white_noise():
     return (np.clip(np.random.randn(16000,)*0.1,-1,1)).astype(np.float32)
 

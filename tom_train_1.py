@@ -245,7 +245,7 @@ def run_validation(set_name,step):
     if set_name != "train": # (because train runs at the end and we want this to stick for the Comp set)
         for _ in range(50):
             feed_dict = get_batch(data_index["train"],batch_size,style=style)
-            feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate,is_training_ph: True})
+            feed_dict.update({keep_prob: 0.8,learning_rate_ph:learning_rate,is_training_ph: True})
             _,_ = sess.run([update_ops,loss_mean],feed_dict)
 
     if set_name == "train":
@@ -267,10 +267,10 @@ is_training_ph = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 
-features = make_features(processed_wavs,is_training_ph,"log-mel")
+features = make_features(processed_wavs,is_training_ph,"identity")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,is_training_ph)
+final_layer, open_max_layer = full_resdilate(features,keep_prob,output_neurons,is_training_ph)
 
 probabilities = tf.nn.softmax(final_layer)
 
@@ -294,8 +294,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_full_dropout_relu_bn_switch",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_full_dropout_relu_bn_switch",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_full_resdilate",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_full_resdilate",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -306,7 +306,7 @@ for i in range(steps):
     if i > 0 and i % 500 == 0:
         learning_rate = 0.9*learning_rate
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
-    feed_dict.update({keep_prob: 0.5,learning_rate_ph:learning_rate,is_training_ph: True})
+    feed_dict.update({keep_prob: 0.8,learning_rate_ph:learning_rate,is_training_ph: True})
     # now here's where we run the real, convnet part
     if i % 10 == 0:
         _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
@@ -318,7 +318,7 @@ for i in range(steps):
     if i % eval_step == 0 or i == (steps - 1):
         val_loss, val_acc = run_validation("val",i)
         if val_loss > last_val_loss:
-            learning_rate = 0.75*learning_rate
+            learning_rate = 0.25*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
             # print("Restoring former model and rerunning validation")
             # saver.restore(sess,"./model.ckpt")
