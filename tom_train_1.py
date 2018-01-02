@@ -163,7 +163,7 @@ def run_validation(set_name,step):
     for _ in range(50):
         feed_dict = get_batch(data_index["train"],batch_size,style=style)
         feed_dict.update({keep_prob: 1.0,learning_rate_ph:learning_rate,is_training_ph: True})
-         _,_ = sess.run([update_ops,loss_mean],feed_dict)
+        up_blah,loss_blah = sess.run([update_ops,loss_mean],feed_dict)
     if set_name == "train":
         from collections import defaultdict
         AVs = defaultdict(list)
