@@ -11,8 +11,8 @@ sample_rate = 16000
 def tf_preprocess(wavs,bg_wavs,is_training):
     def training_process(wavs,bg_wavs):
         # time stretch half the time, pitch shift the other half (all batch-wise, bc that makes the batch time 20x faster)
-        augmentation_picker = tf.random_uniform([],0,1)
-        augmented_wavs = tf.cond(tf.less(augmentation_picker,0.5),lambda: tf_batch_time_stretch(wavs),lambda: tf_batch_pitch_shift(wavs))
+        # augmentation_picker = tf.random_uniform([],0,1)
+        # augmented_wavs = tf.cond(tf.less(augmentation_picker,0.5),lambda: tf_batch_time_stretch(wavs),lambda: tf_batch_pitch_shift(wavs))
         return tf.map_fn(train_preprocess,[wavs,bg_wavs],parallel_iterations=120,dtype=tf.float32,back_prop=False)
 
     def testing_process(wavs):
@@ -23,6 +23,8 @@ def tf_preprocess(wavs,bg_wavs,is_training):
 def train_preprocess(tensors):
     wav = tensors[0]
     bg_wav = tensors[1]
+    # wav = tf_pitch_shift(wav)
+    wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
     wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
     wav = tf_add_noise(wav,bg_wav)
@@ -77,7 +79,8 @@ def tf_get_word(wav,size=16000):
     return frame_stack[max_frame_vol,:]
 
 def tf_pad(wav):
-    word_frame_size = tf.random_uniform([],12000,16000,dtype=tf.int32)
+    """This NEEDS to be done better"""
+    word_frame_size = tf.random_uniform([],15000,16000,dtype=tf.int32)
     left_pad = tf.random_uniform([],0,16000 - word_frame_size,dtype=tf.int32)
     right_pad = 16000 - word_frame_size - left_pad
     wav = tf_get_word(wav,word_frame_size)
@@ -215,7 +218,7 @@ def pad(wav):
 
 # still have to normalize the level of the noise (50x too high)
 def white_noise():
-    return (np.random.rand(16000,)*2 - 1).astype(np.float32)
+    return (np.clip(np.random.randn(16000,)*0.1,-1,1)).astype(np.float32)
 
 @jit
 def red_noise(r=0.5):
@@ -235,7 +238,7 @@ def red_noise(r=0.5):
 # also try adding effects like reverb, echo, flange, phase, etc to words
 def get_noise(bg_data):
     background_frequency = 0.8
-    max_background_volume = 0.1
+    max_background_volume = 0.4
     bg_sounds = []
     for _ in range(2):
         if np.random.uniform(0,1) < 0.5: # use regular background noise
