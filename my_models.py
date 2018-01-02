@@ -202,12 +202,12 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,is_training):
     c = tf.contrib.layers.flatten(c)
     c = tf.nn.dropout(c,keep_prob)
 
-    fc = tf.contrib.slim.fully_connected(c,128,activation_fn=None,weights_regularizer=tf.contrib.slim.l2_regularizer(0.0005))
+    fc = tf.contrib.slim.fully_connected(c,128)
     fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
-    fc = tf.nn.relu(fc)
     fc = tf.nn.dropout(fc,keep_prob)
 
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    final_layer = tf.contrib.slim.batch_norm(final_layer,is_training=is_training,decay=0.9)
     print(c.shape)
     return final_layer, fc
 
