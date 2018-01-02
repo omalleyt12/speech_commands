@@ -434,11 +434,10 @@ def full_resdilate(features,keep_prob,num_final_neurons,is_training):
         print(c.shape)
     mp = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
     ap = tf.nn.avg_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
-    print(ap.dtype)
     flat_conv = tf.concat([
         tf.contrib.layers.flatten(mp),
         tf.contrib.layers.flatten(ap)
-    ],axis=0)
+    ],axis=1)
     flat_conv = tf.nn.dropout(flat_conv,keep_prob)
     print(flat_conv.shape)
 
