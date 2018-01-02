@@ -33,7 +33,7 @@ def play(a):
 style = "unknown"
 batch_size = 100
 eval_step = 500
-steps = 1000
+steps = 2000000
 learning_rate = 0.01
 # decay_every = 2000
 decay_rate = 0.10
@@ -159,89 +159,99 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
     return feed_dict
 
 def run_validation(set_name,step):
+    # update the variance on batch normalization without dropout
+    for _ in range(50):
+        feed_dict = get_batch(data_index["train"],batch_size,style=style)
+        feed_dict.update({keep_prob: 1.0,learning_rate_ph:learning_rate,is_training_ph: True})
+           _,_ = sess.run([update_ops,loss_mean],feed_dict)
+    if set_name == "train":
+        from collections import defaultdict
+        AVs = defaultdict(list)
+    val_size = len(data_index[set_name])
+    val_offset = 0
+    val_acc = RunningAverage()
+    val_loss = RunningAverage()
+    val_conf_mat = np.zeros((output_neurons,output_neurons))
+    pred_df_list = []
+    while val_offset < val_size:
+        feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
+        feed_dict.update({keep_prob:1.0,is_training_ph:False})
+        open_max, val_correct, val_pred,val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([open_max_layer,is_correct,predictions,merged_summaries,accuracy_tensor,loss_mean,confusion_matrix],feed_dict)
+        val_writer.add_summary(val_sum_val,step)
+        val_acc.add(val_acc_val)
+        val_loss.add(val_loss_val)
+        val_conf_mat += val_conf_mat_val
+        val_offset += batch_size
+        val_pred_list = list(val_pred)
+        for val_rec,val_p in zip(data_index[set_name][val_offset:val_offset+batch_size],val_pred_list[:batch_size]):
+            pred_df_list.append({
+                "true_label":val_rec["label"],
+                "true_word":val_rec["word"],
+                "pred_label":all_words[val_p],
+                "file":val_rec["file"]
+            })
+        silence_end = batch_size + int(batch_size * silence_percentage / 100)
+        for val_p in val_pred_list[batch_size:silence_end]:
+            pred_df_list.append({
+                "true_label":"silence",
+                "true_word":"silence",
+                "pred_label":all_words[val_p],
+                "file":None
+            })
+        for val_p in val_pred_list[silence_end:]:
+            pred_df_list.append({
+                "true_label":"unknown",
+                "true_word":"unknown",
+                "pred_label":all_words[val_p],
+                "file":None
+            })
         if set_name == "train":
-            from collections import defaultdict
-            AVs = defaultdict(list)
-        val_size = len(data_index[set_name])
-        val_offset = 0
-        val_acc = RunningAverage()
-        val_loss = RunningAverage()
-        val_conf_mat = np.zeros((output_neurons,output_neurons))
-        pred_df_list = []
-        while val_offset < val_size:
-            feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
-            feed_dict.update({keep_prob:1.0,is_training_ph:False})
-            open_max, val_correct, val_pred,val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([open_max_layer,is_correct,predictions,merged_summaries,accuracy_tensor,loss_mean,confusion_matrix],feed_dict)
-            val_writer.add_summary(val_sum_val,step)
-            val_acc.add(val_acc_val)
-            val_loss.add(val_loss_val)
-            val_conf_mat += val_conf_mat_val
-            val_offset += batch_size
-            val_pred_list = list(val_pred)
-            for val_rec,val_p in zip(data_index[set_name][val_offset:val_offset+batch_size],val_pred_list[:batch_size]):
-                pred_df_list.append({
-                    "true_label":val_rec["label"],
-                    "true_word":val_rec["word"],
-                    "pred_label":all_words[val_p],
-                    "file":val_rec["file"]
-                })
-            silence_end = batch_size + int(batch_size * silence_percentage / 100)
-            for val_p in val_pred_list[batch_size:silence_end]:
-                pred_df_list.append({
-                    "true_label":"silence",
-                    "true_word":"silence",
-                    "pred_label":all_words[val_p],
-                    "file":None
-                })
-            for val_p in val_pred_list[silence_end:]:
-                pred_df_list.append({
-                    "true_label":"unknown",
-                    "true_word":"unknown",
-                    "pred_label":all_words[val_p],
-                    "file":None
-                })
-            if set_name == "train":
-                for i,p in enumerate(val_pred):
-                    if val_correct[i]:
-                        # only care about the direction of the unit-normed vector
-                        open_max_vector = open_max[i,:]
-                        normed_open_max_vector = open_max_vector/np.linalg.norm(open_max_vector)
-                        AVs[p].append(normed_open_max_vector)
-        if set_name == "train":
-            MAVs = {}
-            DAVs = defaultdict(list)
-            MR_MODELS = {}
-            for c in AVs.keys():
-                MAVs[c] = np.stack(AVs[c]).mean(axis=0)
-                for v in AVs[c]:
-                    DAVs[c].append(spd.cosine(v,MAVs[c]))
-                mr = libmr.MR()
-                biggest_true_distances = sorted(DAVs[c])[-20:]
-                mr.fit_high(biggest_true_distances,len(biggest_true_distances))
-                MR_MODELS[c] = mr
-            with open("MAVs.pickle","wb") as f:
-                pickle.dump(MAVs,f)
-            with open("AVs.pickle","wb") as f:
-                pickle.dump(AVs,f)
-            with open("DAVs.pickle","wb") as f:
-                pickle.dump(DAVs,f)
-            with open("MR_MODELS.pickle","wb") as f:
-                pickle.dump(MR_MODELS,f)
+            for i,p in enumerate(val_pred):
+                if val_correct[i]:
+                    # only care about the direction of the unit-normed vector
+                    open_max_vector = open_max[i,:]
+                    normed_open_max_vector = open_max_vector/np.linalg.norm(open_max_vector)
+                    AVs[p].append(normed_open_max_vector)
+    if set_name == "train":
+        MAVs = {}
+        DAVs = defaultdict(list)
+        MR_MODELS = {}
+        for c in AVs.keys():
+            MAVs[c] = np.stack(AVs[c]).mean(axis=0)
+            for v in AVs[c]:
+                DAVs[c].append(spd.cosine(v,MAVs[c]))
+            mr = libmr.MR()
+            biggest_true_distances = sorted(DAVs[c])[-20:]
+            mr.fit_high(biggest_true_distances,len(biggest_true_distances))
+            MR_MODELS[c] = mr
+        with open("MAVs.pickle","wb") as f:
+            pickle.dump(MAVs,f)
+        with open("AVs.pickle","wb") as f:
+            pickle.dump(AVs,f)
+        with open("DAVs.pickle","wb") as f:
+            pickle.dump(DAVs,f)
+        with open("MR_MODELS.pickle","wb") as f:
+            pickle.dump(MR_MODELS,f)
 
 
+    tf.logging.info("{} Step {} LR {} Accuracy {} Loss {}".format(set_name,step,learning_rate,val_acc,val_loss))
+    df_words = all_words if style == "full" else wanted_words
 
+    pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(set_name))
 
-        tf.logging.info("{} Step {} LR {} Accuracy {} Loss {}".format(set_name,step,learning_rate,val_acc,val_loss))
-        df_words = all_words if style == "full" else wanted_words
+    pd.DataFrame(pred_df_list).to_csv("predictions_{}.csv".format(set_name))
 
-        pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(set_name))
+    # get variance for batch normalization layers back to normal
+    if set_name != "train": # (because train runs at the end and we want this to stick for the Comp set)
+        for _ in range(50):
+            feed_dict = get_batch(data_index["train"],batch_size,style=style)
+            feed_dict.update({keep_prob: 0.8,learning_rate_ph:learning_rate,is_training_ph: True})
+            _,_ = sess.run([update_ops,loss_mean],feed_dict)
 
-        pd.DataFrame(pred_df_list).to_csv("predictions_{}.csv".format(set_name))
-
-        if set_name == "train":
-            return MAVs, MR_MODELS
-        else:
-            return val_loss.calculate(), val_acc.calculate()
+    if set_name == "train":
+        return MAVs, MR_MODELS
+    else:
+        return val_loss.calculate(), val_acc.calculate()
 
 
 data_index, unknown_index = load_train_data(style=style)
@@ -284,8 +294,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_full_bn_80_keep",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_full_bn_80_keep",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_full_bn_80_keep_real",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_full_bn_80_keep_real",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
