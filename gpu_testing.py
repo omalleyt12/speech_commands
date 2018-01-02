@@ -40,20 +40,20 @@ a = tf.map_fn(tf_time_stretch,f,parallel_iterations=120)
 a_batch = tf_batch_time_stretch(f)
 
 b = spectral_ops.rfft(frames,[512])
-s = tf.contrib.signal.stft(f,300,100)
+s = stft(f,300,100)
 si = tf.contrib.signal.inverse_stft(s,300,100)
 
 test_tf_shape = tf.shape(b)
 
-# sess = tf.InteractiveSession(config=tf.ConfigProto(log_device_placement=True))
-sess = tf.InteractiveSession()
+sess = tf.InteractiveSession(config=tf.ConfigProto(log_device_placement=True))
+# sess = tf.InteractiveSession()
 
 from time import time
 start = time()
 for _ in range(10):
     # sess.run(test_shape,{frames:np.zeros((1000,1000),dtype=np.float32)})
-    # sess.run(s,{f:np.zeros((120,16000),dtype=np.float32)})
+    sess.run(s,{f:np.zeros((120,16000),dtype=np.float32)})
     # sess.run(b,{frames:np.zeros((1000,1000),dtype=np.float32)})
-    sess.run(a_batch,{f:np.zeros((120,16000),dtype=np.float32)})
+    # sess.run(a,{f:np.zeros((120,16000),dtype=np.float32)})
 print("Time taken")
 print(time() - start)

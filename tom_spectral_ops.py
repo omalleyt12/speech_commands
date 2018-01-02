@@ -21,6 +21,7 @@ from __future__ import print_function
 import functools
 
 import numpy as np
+import tensorflow as tf
 
 from tensorflow.contrib.signal.python.ops import reconstruction_ops
 # from tensorflow.contrib.signal.python.ops import shape_ops
@@ -60,14 +61,13 @@ def stft(signals, frame_length, frame_step, fft_length=None,
       not scalar, or `frame_step` is not scalar.
   [stft]: https://en.wikipedia.org/wiki/Short-time_Fourier_transform
   """
-  with ops.name_scope(name, 'stft', [signals, frame_length,
-                                     frame_step]):
+  with ops.name_scope(name, 'stft', [signals, frame_length,frame_step]):
     signals = ops.convert_to_tensor(signals, name='signals')
-    signals.shape.with_rank_at_least(1)
+    # signals.shape.with_rank_at_least(1)
     frame_length = ops.convert_to_tensor(frame_length, name='frame_length')
     frame_length.shape.assert_has_rank(0)
     frame_step = ops.convert_to_tensor(frame_step, name='frame_step')
-    frame_step.shape.assert_has_rank(0)
+    # frame_step.shape.assert_has_rank(0)
 
     if fft_length is None:
       fft_length = _enclosing_power_of_two(frame_length)
@@ -75,7 +75,7 @@ def stft(signals, frame_length, frame_step, fft_length=None,
       fft_length = ops.convert_to_tensor(fft_length, name='fft_length')
 
     framed_signals = shape_ops.frame(
-        signals, frame_length, frame_step, pad_end=pad_end)
+            signals, frame_length, frame_step, pad_end=pad_end,name="TOMBLAH")
 
     # Optionally window the framed signals.
     if window_fn is not None:
@@ -264,3 +264,49 @@ def _enclosing_power_of_two(value):
       math_ops.pow(2.0, math_ops.ceil(
           math_ops.log(math_ops.to_float(value)) / math_ops.log(2.0))),
       value.dtype)
+
+
+f = tf.placeholder(tf.float32,[None,16000])
+s = stft(f,300,100)
+
+def tf_time_stretch(wav):
+    # speedx = tf.truncated_normal([],1,0.2)
+    speedx = 1.1
+    frame_length = 300
+    frame_step_in = int(0.25 * 300)
+    frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)
+    s = stft(wav,frame_length,frame_step_in)
+    a = inverse_stft(s,frame_length,frame_step_out)
+    # return tf_get_word(a,16000)
+    return a
+
+def tf_batch_time_stretch(wavs):
+    speedx = tf.truncated_normal([],1,0.2)
+    frame_length = 300
+    frame_step_in = int(0.25 * 300)
+    frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)
+    s = stft(wavs,frame_length,frame_step_in)
+    a = inverse_stft(s,frame_length,frame_step_out)
+    return tf.map_fn(tf_get_word,wavs,parallel_iterations=120,back_prop=False)
+
+def tf_get_word(wav,size=16000):
+    frames = shape_ops.frame(wav,size,300,pad_end=True)
+    frame_stack = tf.stack(frames)
+    frame_vols = tf.reduce_mean(tf.pow(frame_stack,2),axis=1)
+    max_frame_vol = tf.argmax(frame_vols)
+    return frame_stack[max_frame_vol,:]
+
+a = tf.map_fn(tf_time_stretch,f,parallel_iterations=120)
+
+sess = tf.InteractiveSession(config=tf.ConfigProto(log_device_placement=True))
+# sess = tf.InteractiveSession()
+
+from time import time
+start = time()
+for _ in range(10):
+    # sess.run(test_shape,{frames:np.zeros((1000,1000),dtype=np.float32)})
+    # sess.run(s,{f:np.zeros((120,16000),dtype=np.float32)})
+    # sess.run(b,{frames:np.zeros((1000,1000),dtype=np.float32)})
+    sess.run(a,{f:np.zeros((100,16000),dtype=np.float32)})
+print("Time taken")
+print(time() - start)
