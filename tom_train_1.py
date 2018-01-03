@@ -267,7 +267,7 @@ is_training_ph = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 
-features = make_features(processed_wavs,is_training_ph,"log-mels")
+features = make_features(processed_wavs,is_training_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,is_training_ph)
