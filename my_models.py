@@ -201,12 +201,31 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,is_training):
 
     c = tf.contrib.layers.flatten(c)
 
-    fc = tf.contrib.slim.fully_connected(c,128)
+    fc = tf.contrib.slim.fully_connected(c,256)
     fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
 
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
     print(c.shape)
     return final_layer, fc
+
+def overdrive_res(features,keep_prob,num_final_neurons,is_training):
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+    def res_conv(input_c,channels,kernel,is_training,mp=None):
+        x = slim.conv2d(input_c,channels,kernel,activation_fn=None)
+        c = slim.batch_norm(x,is_training=is_training,decay=0.9)
+        c = tf.nn.relu(c)
+        c = slim.conv2d(c,channels,kernel,activation_fn=None)
+        res = x + c
+        res = slim.batch_norm(res,is_training=is_training,decay=0.9)
+        res = tf.nn.relu(res)
+        if mp is not None:
+            return tf.nn.max_pool(res,[1,mp[0],mp[1],1],[1,mp[0],mp[1],1],"VALID")
+        else:
+            return res
+
+    c = res_conv(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+
 
 def slim_conv2d(input_channel,channels,kernel_size,is_training,padding="SAME",mp=None,l2_penalty=0.0005):
     c = tf.contrib.slim.conv2d(input_channel,channels,kernel_size,activation_fn=None,padding=padding,weights_regularizer=tf.contrib.slim.l2_regularizer(l2_penalty))

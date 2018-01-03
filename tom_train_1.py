@@ -1,5 +1,5 @@
-wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","off","stop","go"]
-all_words = wanted_words + ["bed","bird","cat","dog","eight","five","four","happy","house","marvin","nine","one","seven","sheila","six","three","tree","two","wow","zero","true_unknown"]
+wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","one","off","stop","go"]
+all_words = wanted_words + ["bed","bird","cat","dog","eight","five","four","happy","house","marvin","nine","seven","sheila","six","three","tree","two","wow","zero","true_unknown"]
 all_words_index = {w:i for i,w in enumerate(all_words)}
 
 import pickle
@@ -281,7 +281,7 @@ total_loss = tf.losses.get_total_loss()
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # with tf.control_dependencies(update_ops):
-train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(total_loss)
+train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(total_loss)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
@@ -364,6 +364,9 @@ while offset < len(test_index):
     test_batch_df = pd.DataFrame([{"fname":ti,"label":tl} for ti,tl in zip(test_files,test_labels)])
     offset += test_batch_size
     df = pd.concat([df,test_batch_df])
+
+# help the model distinguish better between on and one
+df["label"][df["label"] == "one"] = "unknown"
 df.to_csv("my_guesses_3.csv",index=False)
 pd.DataFrame(test_info).to_csv("test_mav_info.csv")
 sess.close()
