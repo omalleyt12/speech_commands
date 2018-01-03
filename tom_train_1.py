@@ -160,10 +160,10 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
 
 def run_validation(set_name,step):
     # update the variance on batch normalization without dropout
-    for _ in range(50):
-        feed_dict = get_batch(data_index["train"],batch_size,style=style)
-        feed_dict.update({keep_prob: 1.0,learning_rate_ph:learning_rate,is_training_ph: False})
-        up_blah,loss_blah = sess.run([update_ops,loss_mean],feed_dict)
+    # for _ in range(50):
+    #     feed_dict = get_batch(data_index["train"],batch_size,style=style)
+    #     feed_dict.update({keep_prob: 1.0,learning_rate_ph:learning_rate,is_training_ph: False})
+    #     up_blah,loss_blah = sess.run([update_ops,loss_mean],feed_dict)
     if set_name == "train":
         from collections import defaultdict
         AVs = defaultdict(list)
@@ -242,11 +242,11 @@ def run_validation(set_name,step):
     pd.DataFrame(pred_df_list).to_csv("predictions_{}.csv".format(set_name))
 
     # get variance for batch normalization layers back to normal
-    if set_name != "train": # (because train runs at the end and we want this to stick for the Comp set)
-        for _ in range(50):
-            feed_dict = get_batch(data_index["train"],batch_size,style=style)
-            feed_dict.update({keep_prob: 0.8,learning_rate_ph:learning_rate,is_training_ph: True})
-            _,_ = sess.run([update_ops,loss_mean],feed_dict)
+    # if set_name != "train": # (because train runs at the end and we want this to stick for the Comp set)
+    #     for _ in range(50):
+    #         feed_dict = get_batch(data_index["train"],batch_size,style=style)
+    #         feed_dict.update({keep_prob: 0.8,learning_rate_ph:learning_rate,is_training_ph: True})
+    #         _,_ = sess.run([update_ops,loss_mean],feed_dict)
 
     if set_name == "train":
         return MAVs, MR_MODELS
@@ -281,7 +281,7 @@ total_loss = tf.losses.get_total_loss()
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # with tf.control_dependencies(update_ops):
-train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(total_loss)
+train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(total_loss)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
