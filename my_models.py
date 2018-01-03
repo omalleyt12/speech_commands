@@ -407,6 +407,17 @@ def small_resdilate(features,keep_prob,num_final_neurons,is_training):
     print(final_layer.shape)
     return final_layer
 
+def short_spec_conv(features,keep_prob,num_final_neurons,is_training):
+    """This is hopefully going to work well for short stride spectrograms"""
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+    c = conv2d(fingerprint_4d,64,[3,3],is_training)
+    c = conv2d(c,64,[3,3],is_training)
+    c = conv2d(c,64,[3,3],is_training)
+
+    c = tf.nn.max_pool(c,[1,1,2,1],[1,1,2,1])
+
+
 def full_resdilate(features,keep_prob,num_final_neurons,is_training):
     conv_keep_prob = tf.cond(is_training, lambda: 0.8, lambda: 1.0)
     def cool_layer_bn(input_layer,channels,scope,is_training):
