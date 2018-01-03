@@ -27,7 +27,7 @@ def train_preprocess(tensors):
     # wav = tf_pitch_shift(wav)
     # wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
-    wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
+    # wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
     wav = tf_add_noise(wav,bg_wav)
     return tf_volume_equalize(wav) # equalize the volume again AFTER adding noise
 
@@ -40,7 +40,7 @@ def fast_time_stretch(signals):
         new_wav = reconstruction_ops.overlap_and_add(framed_signals,frame_step_out)
         return tf_get_word(new_wav)
 
-    speedx = tf.random_uniform([tf.shape(signals)[0]],0.7,1.3)
+    speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
     frame_length = 300
     frame_step_in = int(300*0.25)
     frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)
@@ -104,7 +104,7 @@ def tf_batch_time_stretch(wavs):
     return tf.map_fn(tf_get_word,wavs,parallel_iterations=120,back_prop=False)
 
 def tf_get_word(wav,size=16000):
-    frames = shape_ops.frame(wav,size,1000,pad_end=True)
+    frames = shape_ops.frame(wav,size,300,pad_end=True)
     frame_stack = tf.stack(frames)
     frame_vols = tf.reduce_mean(tf.pow(frame_stack,2),axis=1)
     max_frame_vol = tf.argmax(frame_vols)
@@ -137,7 +137,7 @@ def tf_volume_equalize(wav,vary=False):
         control_vol = tf.truncated_normal([],0.1,0.01) # since the peak volume strategy I picked isn't perfect
     else:
         control_vol = tf.convert_to_tensor(0.1,tf.float32)
-    chunks = tf.split(wav,8)
+    chunks = tf.split(wav,50)
     vols = [tf.sqrt(tf.reduce_mean(tf.pow(chunk,2))) for chunk in chunks]
     vols = tf.stack(vols)
     max_vol = tf.reduce_max(vols)
@@ -267,39 +267,52 @@ def red_noise(r=0.5):
 # maybe use combos of 10 of the training samples, all very quiet, to simulate real background conversation (no, sounds like words still)
 # adjust optimal background volume
 # also try adding effects like reverb, echo, flange, phase, etc to words
+# def get_noise(bg_data):
+#     background_frequency = 0.8
+#     max_background_volume = 0.15
+#     bg_sounds = []
+#     for _ in range(2):
+#         if np.random.uniform(0,1) < 0.5: # use regular background noise
+#             bg_index = np.random.randint(len(bg_data))
+#             bg_samp = bg_data[bg_index]
+#             bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
+#             bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
+#         else: # use generated white and red noise
+#             if np.random.uniform(0,1) < 0.25:
+#                 bg_sliced = white_noise()
+#             else:
+#                 r = np.random.uniform(0.01,0.99)
+#                 bg_sliced = red_noise(r)
+#         bg_sliced = np.clip(bg_sliced*0.1/np.sqrt(np.mean(bg_sliced**2)),-1.0,1.0)
+#         bg_sounds.append(bg_sliced)
+#     combiner = np.random.uniform(0,1)
+#     if combiner < 0.66:
+#         # can try this if model is still not generalizing
+#         sound1_ratio = np.random.uniform(0,1)
+#         sound2_ratio = 1 - sound1_ratio
+#         bg_combined = sound1_ratio*bg_sounds[0] + sound2_ratio*bg_sounds[1]
+#         # bg_combined = bg_sounds[0] + bg_sounds[1]
+#     else:
+#         bg_combined = bg_sounds[0]
+#     bg_combined = np.clip(bg_combined*0.1/np.sqrt(np.mean(bg_combined**2)),-1.0,1.0)
+#     if np.random.uniform(0,1) < background_frequency:
+#         bg_volume = np.random.uniform(0,max_background_volume)
+#     else:
+#         bg_volume = 0
+#     return bg_volume*bg_combined
+
 def get_noise(bg_data):
     background_frequency = 0.8
-    max_background_volume = 0.15
-    bg_sounds = []
-    for _ in range(2):
-        if np.random.uniform(0,1) < 0.5: # use regular background noise
-            bg_index = np.random.randint(len(bg_data))
-            bg_samp = bg_data[bg_index]
-            bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
-            bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
-        else: # use generated white and red noise
-            if np.random.uniform(0,1) < 0.25:
-                bg_sliced = white_noise()
-            else:
-                r = np.random.uniform(0.01,0.99)
-                bg_sliced = red_noise(r)
-        bg_sliced = np.clip(bg_sliced*0.1/np.sqrt(np.mean(bg_sliced**2)),-1.0,1.0)
-        bg_sounds.append(bg_sliced)
-    combiner = np.random.uniform(0,1)
-    if combiner < 0.66:
-        # can try this if model is still not generalizing
-        sound1_ratio = np.random.uniform(0,1)
-        sound2_ratio = 1 - sound1_ratio
-        bg_combined = sound1_ratio*bg_sounds[0] + sound2_ratio*bg_sounds[1]
-        # bg_combined = bg_sounds[0] + bg_sounds[1]
-    else:
-        bg_combined = bg_sounds[0]
-    bg_combined = np.clip(bg_combined*0.1/np.sqrt(np.mean(bg_combined**2)),-1.0,1.0)
+    max_background_volume = 0.1
+    bg_index = np.random.randint(len(bg_data))
+    bg_samp = bg_data[bg_index]
+    bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
+    bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
     if np.random.uniform(0,1) < background_frequency:
         bg_volume = np.random.uniform(0,max_background_volume)
     else:
         bg_volume = 0
-    return bg_volume*bg_combined
+    return bg_volume*bg_sliced
 
 def reverse(d):
     return d[::-1]

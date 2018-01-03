@@ -34,7 +34,7 @@ style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 2000000
-learning_rate = 0.001
+learning_rate = 0.01
 # decay_every = 2000
 decay_rate = 0.10
 sample_rate = 16000 # per sec
@@ -267,10 +267,10 @@ is_training_ph = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 
-features = make_features(processed_wavs,is_training_ph,"log-mel")
+features = make_features(processed_wavs,is_training_ph,"log-mel-40")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,is_training_ph)
+final_layer, open_max_layer = okconv(features,keep_prob,output_neurons,is_training_ph)
 
 probabilities = tf.nn.softmax(final_layer)
 
@@ -281,7 +281,7 @@ total_loss = tf.losses.get_total_loss()
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # with tf.control_dependencies(update_ops):
-train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(total_loss)
+train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(total_loss)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
@@ -294,8 +294,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_full_resdilate",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_full_resdilate",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_ok_conv",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_ok_conv",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)

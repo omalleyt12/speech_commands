@@ -6,7 +6,7 @@ import mel_matrix
 
 sample_rate = 16000
 window_size_samples = 30 * 16 # ms * samples/ms
-window_stride_samples = 8 * 16
+window_stride_samples = 10 * 16
 
 
 def make_features(wavs,is_training,name="log-mel"):
@@ -14,7 +14,7 @@ def make_features(wavs,is_training,name="log-mel"):
         print("Features: Log Mel")
         return make_vtlp_mels(wavs,is_training,bins=128)
     elif name == "log-mel-40":
-        return make_new_mels(wavs,is_training)
+        return make_vtlp_mels(wavs,is_training,bins=40)
     elif name == "mfcc":
         print("Features: MFCC")
         return make_mfccs(wavs)
@@ -48,7 +48,7 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128):
         magnitude_spectrograms = tf.abs(stfts)
         # Warp the linear-scale, magnitude spectrograms into the mel-scale.
         num_spectrogram_bins = magnitude_spectrograms.shape[-1].value
-        lower_edge_hertz, upper_edge_hertz, num_mel_bins = 0.0, 7600.0, bins
+        lower_edge_hertz, upper_edge_hertz, num_mel_bins = 0.0, 8000.0, bins
         linear_to_mel_weight_matrix = mel_matrix.linear_to_mel_weight_matrix(
           num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz,
             upper_edge_hertz,is_training)
@@ -59,25 +59,6 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128):
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
         return log_mel_spectrograms
 
-def make_new_mels(sig,is_training,name=None,bins=40):
-    """For larger time dimension spectrogram and smaller Mel dimension"""
-    with tf.name_scope(name,"audio_processing",[sig]) as scope:
-        window_size_samples = 30*16
-        window_stride_samples = 7*16
-        stfts = tf.contrib.signal.stft(sig, frame_length=window_size_samples, frame_step=window_stride_samples)
-        magnitude_spectrograms = tf.abs(stfts)
-        # Warp the linear-scale, magnitude spectrograms into the mel-scale.
-        num_spectrogram_bins = magnitude_spectrograms.shape[-1].value
-        lower_edge_hertz, upper_edge_hertz, num_mel_bins = 0.0, 8000.0, 40
-        linear_to_mel_weight_matrix = mel_matrix.linear_to_mel_weight_matrix(
-          num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz,
-            upper_edge_hertz,is_training)
-        mel_spectrograms = tf.tensordot(magnitude_spectrograms, linear_to_mel_weight_matrix, 1)
-        # Note: Shape inference for `tf.tensordot` does not currently handle this case.
-        mel_spectrograms.set_shape(magnitude_spectrograms.shape[:-1].concatenate(linear_to_mel_weight_matrix.shape[-1:]))
-        log_offset = 1e-6
-        log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
-        return log_mel_spectrograms
 
 
 def make_mfccs(sig):
