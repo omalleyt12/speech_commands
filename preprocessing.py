@@ -112,7 +112,7 @@ def tf_get_word(wav,size=16000):
 
 def tf_pad(wav):
     """This NEEDS to be done better"""
-    word_frame_size = tf.random_uniform([],15000,16000,dtype=tf.int32)
+    word_frame_size = tf.random_uniform([],12000,16000,dtype=tf.int32)
     left_pad = tf.random_uniform([],0,16000 - word_frame_size,dtype=tf.int32)
     right_pad = 16000 - word_frame_size - left_pad
     wav = tf_get_word(wav,word_frame_size)
@@ -137,7 +137,7 @@ def tf_volume_equalize(wav,vary=False):
         control_vol = tf.truncated_normal([],0.1,0.01) # since the peak volume strategy I picked isn't perfect
     else:
         control_vol = tf.convert_to_tensor(0.1,tf.float32)
-    chunks = tf.split(wav,50)
+    chunks = tf.split(wav,8)
     vols = [tf.sqrt(tf.reduce_mean(tf.pow(chunk,2))) for chunk in chunks]
     vols = tf.stack(vols)
     max_vol = tf.reduce_max(vols)
