@@ -275,13 +275,12 @@ final_layer, open_max_layer = okconv(features,keep_prob,output_neurons,is_traini
 probabilities = tf.nn.softmax(final_layer)
 
 loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
+full_loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=full_labels_ph,logits=full_final_layer)
 
-total_loss = tf.losses.get_total_loss()
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-# update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-# with tf.control_dependencies(update_ops):
-train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(total_loss)
+train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(loss_mean)
+full_train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(full_loss_mean)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
