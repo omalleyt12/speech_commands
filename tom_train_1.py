@@ -267,10 +267,10 @@ is_training_ph = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 
-features = make_features(processed_wavs,is_training_ph,"identity")
+features = make_features(processed_wavs,is_training_ph,"log-mels")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer, open_max_layer = full_resdilate(features,keep_prob,output_neurons,is_training_ph)
+final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,is_training_ph)
 
 probabilities = tf.nn.softmax(final_layer)
 
@@ -281,7 +281,7 @@ total_loss = tf.losses.get_total_loss()
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # with tf.control_dependencies(update_ops):
-train_step = tf.train.MomentumOptimizer(learning_rate_ph,0.9).minimize(total_loss)
+train_step = tf.train.AdamOptimizer(0.01).minimize(total_loss)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
