@@ -206,7 +206,7 @@ def volume_equalizer(wav):
     """Makes it so that the noisiest part of a WAV is the same for all WAVs"""
     control_vol = 0.1
 
-    chunks = np.array_split(wav,50)
+    chunks = np.array_split(wav,8)
     vol = np.array([np.sqrt(np.mean(chunk**2)) for chunk in chunks])
     max_vol = vol.max()
 
