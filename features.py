@@ -6,7 +6,7 @@ import mel_matrix
 
 sample_rate = 16000
 window_size_samples = 30 * 16 # ms * samples/ms
-window_stride_samples = 10 * 16
+window_stride_samples = 8 * 16
 
 
 def make_features(wavs,is_training,name="log-mel"):
