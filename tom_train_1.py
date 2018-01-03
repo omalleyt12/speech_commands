@@ -34,7 +34,7 @@ style = "unknown"
 batch_size = 100
 eval_step = 500
 steps = 2000000
-learning_rate = 0.01
+learning_rate = 0.001
 # decay_every = 2000
 decay_rate = 0.10
 sample_rate = 16000 # per sec
@@ -281,7 +281,7 @@ total_loss = tf.losses.get_total_loss()
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 # with tf.control_dependencies(update_ops):
-train_step = tf.train.AdamOptimizer(0.01).minimize(total_loss)
+train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(total_loss)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
@@ -304,7 +304,7 @@ saver = tf.train.Saver()
 last_val_loss = 9999999
 for i in range(steps):
     if i > 0 and i % 500 == 0:
-        learning_rate = 0.9*learning_rate
+        learning_rate = 0.5*learning_rate
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
     feed_dict.update({keep_prob: 0.8,learning_rate_ph:learning_rate,is_training_ph: True})
     # now here's where we run the real, convnet part
