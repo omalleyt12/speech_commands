@@ -314,6 +314,7 @@ def okconv(features,keep_prob,num_final_neurons,num_full_final_neurons,is_traini
 
     fc = tf.contrib.slim.fully_connected(flat_conv,1024)
     fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.95)
+    fc = tf.nn.dropout(fc,keep_prob)
 
     full_fc = tf.contrib.slim.fully_connected(flat_conv,1024)
     full_fc = tf.contrib.slim.batch_norm(full_fc,is_training=is_training,decay=0.95)

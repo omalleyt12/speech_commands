@@ -17,7 +17,7 @@ def tf_preprocess(wavs,bg_wavs,is_training,slow_down):
         return tf.map_fn(train_preprocess,[wavs,bg_wavs],parallel_iterations=120,dtype=tf.float32,back_prop=False)
 
     def testing_process(wavs):
-        wavs = tf.cond(slow_down,lambda: fast_time_stretch(wavs,constant=True),lambda: tf.identity(wavs))
+        # wavs = tf.cond(slow_down,lambda: fast_time_stretch(wavs,constant=True),lambda: tf.identity(wavs))
         return tf.map_fn(test_preprocess,wavs,parallel_iterations=120,back_prop=False)
 
     return tf.cond(is_training,lambda: training_process(wavs,bg_wavs), lambda: testing_process(wavs))
@@ -41,10 +41,10 @@ def fast_time_stretch(signals,constant=False):
         new_wav = reconstruction_ops.overlap_and_add(framed_signals,frame_step_out)
         return tf_get_word(new_wav)
 
-    if not constant:
-        speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
-    else:
-        speedx = tf.constant(1.15)
+    # if not constant:
+    speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
+    # else:
+    #     speedx = tf.constant(np.repeat())
     frame_length = 300
     frame_step_in = int(300*0.25)
     frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)
