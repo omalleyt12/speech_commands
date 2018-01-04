@@ -276,7 +276,7 @@ features = make_features(processed_wavs,is_training_ph,"log-mel-40")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 full_output_neurons = len(all_words)
-final_layer, full_final_layer, open_max_layer = okconv(features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
+final_layer, full_final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
 
 final_layer = tf.cond(use_full_layer,lambda: full_final_layer, lambda: final_layer)
 
@@ -304,8 +304,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_ok_conv_fuller_dropout_5x3",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_ok_conv_fuller_dropout_5x3",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_adam_dropout",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_adam_dropout",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)

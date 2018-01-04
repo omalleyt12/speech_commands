@@ -190,7 +190,7 @@ def overdrive_bn(features,keep_prob,num_final_neurons,is_training):
     print(c.shape)
     return final_layer
 
-def overdrive_full_bn( fffeatures,keep_prob,num_final_neurons,is_training):
+def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
     c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
@@ -203,10 +203,14 @@ def overdrive_full_bn( fffeatures,keep_prob,num_final_neurons,is_training):
 
     fc = tf.contrib.slim.fully_connected(c,256)
     fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons,activation_fn=None)
 
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
     print(c.shape)
-    return final_layer, fc
+    return final_layer, full_final_layer, fc
 
 def overdrive_res(features,keep_prob,num_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
@@ -291,12 +295,12 @@ def okconv(features,keep_prob,num_final_neurons,num_full_final_neurons,is_traini
     """More convs for a 40 log mel spectrogram"""
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
-    c = conv2d(fingerprint_4d,64,[5,3],is_training)
-    c = conv2d(c,64,[5,3],is_training)
-    c = conv2d(c,64,[5,3],is_training,mp=[1,2])
+    c = conv2d(fingerprint_4d,64,[3,3],is_training)
+    c = conv2d(c,64,[3,3],is_training)
+    c = conv2d(c,64,[3,3],is_training,mp=[1,2])
 
-    c = conv2d(c,128,[5,3],is_training)
-    c = conv2d(c,128,[5,3],is_training,mp=[1,2])
+    c = conv2d(c,128,[3,3],is_training)
+    c = conv2d(c,128,[3,3],is_training,mp=[1,2])
 
     c = conv2d(c,512,[1,10],is_training,padding="VALID")
     c = conv2d(c,512,[1,1],is_training)
