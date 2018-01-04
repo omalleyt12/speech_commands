@@ -1,3 +1,4 @@
+*.pickle
 *.ckpt*
 model_files/*
 *.csv
