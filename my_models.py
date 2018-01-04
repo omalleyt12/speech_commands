@@ -287,7 +287,7 @@ def newdrive(features,keep_prob,num_final_neurons,is_training):
 
 
 
-def okconv(features,keep_prob,num_final_neurons,is_training):
+def okconv(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     """More convs for a 40 log mel spectrogram"""
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
@@ -315,9 +315,14 @@ def okconv(features,keep_prob,num_final_neurons,is_training):
     fc = tf.contrib.slim.fully_connected(flat_conv,1024)
     fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.95)
 
+    full_fc = tf.contrib.slim.fully_connected(flat_conv,1024)
+    full_fc = tf.contrib.slim.batch_norm(full_fc,is_training=is_training,decay=0.95)
+
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
-    print(c.shape)
-    return final_layer, fc
+
+    full_final_layer = tf.contrib.layers.fully_connected(full_fc,num_full_final_neurons,activation_fn=None)
+
+    return final_layer, full_final_layer, fc
 
 
 def full_resdilate(features,keep_prob,num_final_neurons,is_training):

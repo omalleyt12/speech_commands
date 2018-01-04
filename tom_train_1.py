@@ -1,5 +1,5 @@
-wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","one","off","stop","go"]
-all_words = wanted_words + ["bed","bird","cat","dog","eight","five","four","happy","house","marvin","nine","seven","sheila","six","three","tree","two","wow","zero","true_unknown"]
+wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","off","stop","go"]
+all_words = wanted_words +["one","bed","bird","cat","dog","eight","five","four","happy","house","marvin","nine","seven","sheila","six","three","tree","two","wow","zero"]
 all_words_index = {w:i for i,w in enumerate(all_words)}
 
 import pickle
@@ -31,6 +31,7 @@ def play(a):
     winsound.PlaySound("testing.wav",winsound.SND_FILENAME)
 
 style = "unknown"
+train_keep_prob = 1.0
 batch_size = 100
 eval_step = 500
 steps = 2000000
@@ -142,18 +143,19 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
             labels.append(all_words_index["silence"])
             bg_wavs.append(pp.get_noise(bg_data))
 
-        unknown_recs = int(batch_size * unknown_percentage / 100)
-        for j in range(unknown_recs):
-            if mode == "val": # Try and make val more deterministic
-                rand_unknown = j
-            else:
-                rand_unknown = np.random.randint(0,len(unknown_index[mode]))
-            u_rec = unknown_index[mode][rand_unknown]["data"]
-            recs.append(u_rec)
-            labels.append(1)
-            bg_wavs.append(pp.get_noise(bg_data))
+        if style != "full":
+            unknown_recs = int(batch_size * unknown_percentage / 100)
+            for j in range(unknown_recs):
+                if mode == "val": # Try and make val more deterministic
+                    rand_unknown = j
+                else:
+                    rand_unknown = np.random.randint(0,len(unknown_index[mode]))
+                u_rec = unknown_index[mode][rand_unknown]["data"]
+                recs.append(u_rec)
+                labels.append(1)
+                bg_wavs.append(pp.get_noise(bg_data))
 
-    feed_dict={ wav_ph: np.stack(recs), bg_wavs_ph: np.stack(bg_wavs)}
+    feed_dict={ wav_ph: np.stack(recs), bg_wavs_ph: np.stack(bg_wavs), use_full_layer: False}
     if mode != "comp":
         feed_dict[labels_ph] = np.stack(labels).astype(np.int32)
     return feed_dict
@@ -255,6 +257,7 @@ def run_validation(set_name,step):
 
 
 data_index, unknown_index = load_train_data(style=style)
+full_data_index, _ = load_train_data("full")
 speakers = get_speakers(unknown_index,data_index)
 bg_data = wl.load_bg_data(sess)
 
@@ -264,23 +267,30 @@ bg_wavs_ph = tf.placeholder(tf.float32,[None,sample_rate])
 keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
+use_full_layer = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
 
 features = make_features(processed_wavs,is_training_ph,"log-mel-40")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
-final_layer, open_max_layer = okconv(features,keep_prob,output_neurons,is_training_ph)
+full_output_neurons = len(all_words)
+final_layer, full_final_layer, open_max_layer = okconv(features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
+
+final_layer = tf.cond(use_full_layer,lambda: full_final_layer, lambda: final_layer)
 
 probabilities = tf.nn.softmax(final_layer)
 
 loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
-full_loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=full_labels_ph,logits=full_final_layer)
+full_loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph,logits=full_final_layer)
 
+# total_loss = tf.losses.get_total_loss()
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(loss_mean)
-full_train_step = tf.train.AdamOptimizer(learning_rate_ph).minimize(full_loss_mean)
+optimizer = tf.train.AdamOptimizer(learning_rate_ph)
+
+train_step = optimizer.minimize(loss_mean)
+full_train_step = optimizer.minimize(full_loss_mean)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
@@ -293,8 +303,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_ok_conv",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_ok_conv",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_ok_conv_fuller",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_ok_conv_fuller",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -303,21 +313,26 @@ saver = tf.train.Saver()
 last_val_loss = 9999999
 for i in range(steps):
     if i > 0 and i % 500 == 0:
-        learning_rate = 0.5*learning_rate
+        learning_rate = 0.9*learning_rate
     feed_dict = get_batch(data_index["train"],batch_size,style=style)
-    feed_dict.update({keep_prob: 0.8,learning_rate_ph:learning_rate,is_training_ph: True})
+    feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
     # now here's where we run the real, convnet part
     if i % 10 == 0:
         _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
         train_writer.add_summary(sum_val,i)
         tf.logging.info("Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
+
+        full_feed_dict = get_batch(full_data_index["train"],batch_size,style="full")
+        full_feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph:True,use_full_layer:True})
+        _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],full_feed_dict)
+        tf.logging.info("Full Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
     else:
         sess.run(train_step,feed_dict)
 
     if i % eval_step == 0 or i == (steps - 1):
         val_loss, val_acc = run_validation("val",i)
         if val_loss > last_val_loss:
-            learning_rate = 0.25*learning_rate
+            learning_rate = 0.5*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
             # print("Restoring former model and rerunning validation")
             # saver.restore(sess,"./model.ckpt")
@@ -364,8 +379,6 @@ while offset < len(test_index):
     offset += test_batch_size
     df = pd.concat([df,test_batch_df])
 
-# help the model distinguish better between on and one
-df["label"][df["label"] == "one"] = "unknown"
 df.to_csv("my_guesses_3.csv",index=False)
 pd.DataFrame(test_info).to_csv("test_mav_info.csv")
 sess.close()
