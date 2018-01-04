@@ -304,8 +304,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_ok_conv_fuller_dropout",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_ok_conv_fuller_dropout",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_ok_conv_fuller_dropout_5x3",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_ok_conv_fuller_dropout_5x3",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)

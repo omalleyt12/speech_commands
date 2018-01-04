@@ -291,12 +291,12 @@ def okconv(features,keep_prob,num_final_neurons,num_full_final_neurons,is_traini
     """More convs for a 40 log mel spectrogram"""
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
-    c = conv2d(fingerprint_4d,64,[3,3],is_training)
-    c = conv2d(c,64,[3,3],is_training)
-    c = conv2d(c,64,[3,3],is_training,mp=[1,2])
+    c = conv2d(fingerprint_4d,64,[5,3],is_training)
+    c = conv2d(c,64,[5,3],is_training)
+    c = conv2d(c,64,[5,3],is_training,mp=[1,2])
 
-    c = conv2d(c,128,[3,3],is_training)
-    c = conv2d(c,128,[3,3],is_training,mp=[1,2])
+    c = conv2d(c,128,[5,3],is_training)
+    c = conv2d(c,128,[5,3],is_training,mp=[1,2])
 
     c = conv2d(c,512,[1,10],is_training,padding="VALID")
     c = conv2d(c,512,[1,1],is_training)
