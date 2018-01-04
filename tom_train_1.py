@@ -155,7 +155,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                 labels.append(1)
                 bg_wavs.append(pp.get_noise(bg_data))
 
-    feed_dict={ wav_ph: np.stack(recs), bg_wavs_ph: np.stack(bg_wavs), use_full_layer: False}
+    feed_dict={ wav_ph: np.stack(recs), bg_wavs_ph: np.stack(bg_wavs), use_full_layer: False, slow_down: False}
     if mode != "comp":
         feed_dict[labels_ph] = np.stack(labels).astype(np.int32)
     return feed_dict
@@ -268,8 +268,9 @@ keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
 use_full_layer = tf.placeholder(tf.bool)
+slow_down = tf.placeholder(tf.bool)
 
-processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph)
+processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph,slow_down)
 
 features = make_features(processed_wavs,is_training_ph,"log-mel-40")
 
@@ -360,6 +361,11 @@ while offset < len(test_index):
     feed_dict = get_batch(test_index,test_batch_size,offset=offset,mode="comp",style=style)
     feed_dict.update({ keep_prob:1.0,is_training_ph:False})
     test_av, test_prob, test_pred = sess.run([open_max_layer,probabilities,predictions],feed_dict=feed_dict)
+
+    # use this to average over the regular speed and slowed down predictions
+    # feed_dict.update({keep_prob:1.0,is_training_ph:False,slow_down:True})
+    # test_prob_slow = sess.run([probabilities],feed_dict)
+    # test_pred = (test_prob + test_prob_slow).argmax(axis=1)
 
     # compute and save distances and MR models probabilities
     for e,p in enumerate(test_pred):
