@@ -15,6 +15,8 @@ def make_features(wavs,is_training,name="log-mel"):
         return make_vtlp_mels(wavs,is_training,bins=128)
     elif name == "log-mel-40":
         return make_vtlp_mels(wavs,is_training,bins=40)
+    elif name == "log-mel-40-energy":
+        return make_vtlp_mels(wavs,is_training,bins=40,energies=True)
     elif name == "mfcc":
         print("Features: MFCC")
         return make_mfccs(wavs)
@@ -41,7 +43,7 @@ def make_log_mel_fb(sig,name=None):
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
         return log_mel_spectrograms
 
-def make_vtlp_mels(sig,is_training,name=None,bins=128):
+def make_vtlp_mels(sig,is_training,name=None,bins=128,energies=False):
     """A limitation with this approach is that the VTLP factor is the same within a batch"""
     with tf.name_scope(name,"audio_processing",[sig]) as scope:
         stfts = tf.contrib.signal.stft(sig, frame_length=window_size_samples, frame_step=window_stride_samples,fft_length=1024)
@@ -58,10 +60,11 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128):
         log_offset = 1e-6
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
 
-        # frame_energies = tf.sqrt(tf.reduce_mean(tf.magnitude_spectrograms**2,axis=2,keep_dims=True))
-
-        # return tf.concat([frame_energies,log_mel_spectrograms],axis=2)
-
+        if energies:
+            frame_energies = tf.sqrt(tf.reduce_mean(tf.magnitude_spectrograms**2,axis=2,keep_dims=True))
+            # subtract the average frame energy
+            frame_energies = frame_energies - tf.reduce_mean(frame_energies,axis=1,keep_dims=1)
+            return tf.concat([frame_energies,log_mel_spectrograms],axis=2)
         return log_mel_spectrograms
 
 

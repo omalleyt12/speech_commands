@@ -329,6 +329,57 @@ def okconv(features,keep_prob,num_final_neurons,num_full_final_neurons,is_traini
 
     return final_layer, full_final_layer, fc
 
+def add_4th_dim(t):
+    return tf.reshape(t,[-1,t.shape[1],t.shape[2],t.shape[3],1])
+
+def okconv_energy(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """More convs for a 40 log mel spectrogram"""
+
+    frame_energies = features[:,:,0]
+    # wow this is super hacky, but i don't know how else to get this var into the convs
+    frame_energies = tf.stack([frame_energies for _ in range(40)],axis=2)
+    frame_energies = add_4th_dim(frame_energies)
+
+    mels = features[:,:,1:]
+    mels = add_4th_dim(mels)
+
+    total_features = tf.stack([mels,features],axis=3)
+
+
+    c = conv2d(total_features,64,[3,3],is_training)
+    c = conv2d(c,64,[3,3],is_training)
+    c = conv2d(c,64,[3,3],is_training,mp=[1,2])
+
+    c = conv2d(c,128,[3,3],is_training)
+    c = conv2d(c,128,[3,3],is_training,mp=[1,2])
+
+    c = conv2d(c,512,[1,10],is_training,padding="VALID")
+    c = conv2d(c,512,[1,1],is_training)
+
+    c = conv2d(c,1024,[7,1],is_training)
+    c = conv2d(c,1024,[7,1],is_training)
+
+    mp = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
+    ap = tf.nn.avg_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
+
+    flat_conv = tf.concat([
+        tf.contrib.layers.flatten(mp),
+        tf.contrib.layers.flatten(ap)
+    ],axis=1)
+
+    fc = tf.contrib.slim.fully_connected(flat_conv,1024)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.95)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+    full_fc = tf.contrib.slim.fully_connected(flat_conv,1024)
+    full_fc = tf.contrib.slim.batch_norm(full_fc,is_training=is_training,decay=0.95)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+
+    full_final_layer = tf.contrib.layers.fully_connected(full_fc,num_full_final_neurons,activation_fn=None)
+
+    return final_layer, full_final_layer, fc
+
 
 def full_resdilate(features,keep_prob,num_final_neurons,is_training):
     conv_keep_prob = tf.cond(is_training, lambda: 0.8, lambda: 1.0)

@@ -272,7 +272,7 @@ slow_down = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph,slow_down)
 
-features = make_features(processed_wavs,is_training_ph,"log-mel-40")
+features = make_features(processed_wavs,is_training_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 full_output_neurons = len(all_words)
