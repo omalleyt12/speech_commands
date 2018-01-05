@@ -318,6 +318,24 @@ def get_noise(bg_data):
         bg_volume = 0
     return bg_volume*bg_sliced
 
+def get_new_noise(bg_data):
+    control_volume = 0.1
+    background_frequency = 0.8
+    if np.random.uniform(0,1) > background_frequency:
+        bg_volume = 0
+    else:
+        # this will give NSRs (inverse of SNR) of truncated exponentially distributed around mean 0.03
+        exp_mean = 30
+        cdf = np.random.random(205)*0.97
+        bg_volume = -np.log(1 - cdf)/exp_mean
+    bg_index = np.random.randint(len(bg_data))
+    bg_samp = bg_data[bg_index]
+    bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
+    bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
+    bg_sliced = bg_sliced*bg_volume*0.1/np.sqrt(np.mean(bg_sliced**2))
+    return np.clip(bg_sliced,-1.0,1.0)
+
+
 def reverse(d):
     return d[::-1]
 
