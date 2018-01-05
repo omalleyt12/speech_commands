@@ -63,8 +63,9 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128,energies=False):
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
 
         # scale the 128 bins log-mels to have zero mean and unit var
-        if bins == 128:
-            log_mel_spectrograms = (log_mel_spectrograms + 2.76295)/3.19395
+        # wow, this really made things WORSE somehow
+        # if bins == 128:
+        #     log_mel_spectrograms = (log_mel_spectrograms + 2.76295)/3.19395
 
         if energies:
             frame_energies = tf.sqrt(tf.reduce_mean(magnitude_spectrograms**2,axis=2,keep_dims=True))
