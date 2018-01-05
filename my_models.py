@@ -212,6 +212,37 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neuron
     print(c.shape)
     return final_layer, full_final_layer, fc
 
+
+def overdrive_full_bn_energies(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    mels = features[:,:,1:]
+    mels = add_4th_dim(mels)
+
+    frame_energies = features[:,:,0]
+    # wow this is super hacky, but i don't know how else to get this var into the convs
+    frame_energies = tf.stack([frame_energies for _ in range(128)],axis=2)
+    frame_energies = add_4th_dim(frame_energies)
+
+    total_features = tf.stack([mels,features],axis=3)
+
+    c = conv2d(total_features,64,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,128,[1,7],is_training,mp=[1,4])
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
+
+    c = tf.contrib.layers.flatten(c)
+
+    fc = tf.contrib.slim.fully_connected(c,256)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons,activation_fn=None)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(c.shape)
+    return final_layer, full_final_layer, fc
+
 def overdrive_res(features,keep_prob,num_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 

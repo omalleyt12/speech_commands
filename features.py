@@ -17,6 +17,8 @@ def make_features(wavs,is_training,name="log-mel"):
         return make_vtlp_mels(wavs,is_training,bins=40)
     elif name == "log-mel-40-energy":
         return make_vtlp_mels(wavs,is_training,bins=40,energies=True)
+    elif name == "log-mel-energy":
+        return make_vtlp_mels(wavs,is_training,bins=128,energies=True)
     elif name == "mfcc":
         print("Features: MFCC")
         return make_mfccs(wavs)
