@@ -180,7 +180,6 @@ def overdrive_bn(features,keep_prob,num_final_neurons,is_training):
     c = conv2d(c,128,[1,7],is_training,mp=[1,4])
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
-    c = conv2d(c,256,[1,1],is_training)
 
     c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
 

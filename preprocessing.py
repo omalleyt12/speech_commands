@@ -41,10 +41,10 @@ def fast_time_stretch(signals,constant=False):
         new_wav = reconstruction_ops.overlap_and_add(framed_signals,frame_step_out)
         return tf_get_word(new_wav)
 
-    # if not constant:
-    speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
-    # else:
-    #     speedx = tf.constant(np.repeat())
+    if not constant:
+        speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
+    else:
+        speedx = tf.constant(np.repeat(1.15,signals.shape[0]).astype(np.float32))
     frame_length = 300
     frame_step_in = int(300*0.25)
     frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)
