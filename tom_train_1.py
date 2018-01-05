@@ -272,11 +272,11 @@ slow_down = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph,slow_down)
 
-features = make_features(processed_wavs,is_training_ph,"log-mel-energy")
+features = make_features(processed_wavs,is_training_ph,"log-mel")
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 full_output_neurons = len(all_words)
-final_layer, full_final_layer, open_max_layer = overdrive_full_bn_energies(features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
+final_layer, full_final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
 
 final_layer = tf.cond(use_full_layer,lambda: full_final_layer, lambda: final_layer)
 
@@ -304,8 +304,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_energy",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_energy",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_extra1x1",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_extra1x1",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
