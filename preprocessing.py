@@ -257,7 +257,7 @@ def white_noise():
 def red_noise(white_noise,r=0.5):
     """0 < r < 1, zero is white noise, bigger r shifts more towards lower frequencies"""
     white = white_noise
-    red = np.zeros((16000),dtype=np.float32)
+    red = np.zeros((white_noise.shape[0]),dtype=np.float32)
     red[0] = white[0]
     for i,ele in enumerate(white[:-1]):
         red[i+1] = r*red[i] + ((1-r**2)**0.5)*white[i+1]
