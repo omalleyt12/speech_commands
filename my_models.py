@@ -215,14 +215,20 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neuron
 
 def overdrive_full_bn_energies(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     mels = features[:,:,1:]
+    print(mels.shape)
     mels = add_4th_dim(mels)
+    print(mels.shape)
 
     frame_energies = features[:,:,0]
+    print(frame_energies.shape)
     # wow this is super hacky, but i don't know how else to get this var into the convs
     frame_energies = tf.stack([frame_energies for _ in range(128)],axis=2)
+    print(frame_energies.shape)
     frame_energies = add_4th_dim(frame_energies)
+    print(frame_energies.shape)
 
-    total_features = tf.stack([mels,features],axis=3)
+    total_features = tf.concat([mels,frame_energies],axis=3)
+    print(total_features.shape)
 
     c = conv2d(total_features,64,[7,3],is_training,mp=[1,3])
     c = conv2d(c,128,[1,7],is_training,mp=[1,4])
@@ -361,7 +367,7 @@ def okconv(features,keep_prob,num_final_neurons,num_full_final_neurons,is_traini
     return final_layer, full_final_layer, fc
 
 def add_4th_dim(t):
-    return tf.reshape(t,[-1,t.shape[1],t.shape[2],t.shape[3],1])
+    return tf.reshape(t,[-1,t.shape[1],t.shape[2],1])
 
 def okconv_energy(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     """More convs for a 40 log mel spectrogram"""

@@ -257,7 +257,7 @@ def run_validation(set_name,step):
 
 
 data_index, unknown_index = load_train_data(style=style)
-full_data_index, _ = load_train_data("full")
+# full_data_index, _ = load_train_data("full")
 speakers = get_speakers(unknown_index,data_index)
 bg_data = wl.load_bg_data(sess)
 
