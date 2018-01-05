@@ -138,7 +138,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         for j in range(silence_recs):
             silence_rec = np.zeros(sample_rate,dtype=np.float32) 
             if mode == "val":
-                silence_rec += pp.get_noise(bg_data) # since noise won't be added to any val data records
+                silence_rec += pp.get_noise(bg_data,val=True) # since noise won't be added to any val data records
             recs.append(silence_rec)
             labels.append(all_words_index["silence"])
             bg_wavs.append(pp.get_noise(bg_data))
@@ -307,27 +307,27 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_slowdown",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_slowdown",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_cmon_noise",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_cmon_noise",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
 sess.run(tf.global_variables_initializer())
 
-tf.logging.info("Running preprocessing of input features")
-scale_input = []
-for i in range(200):
-    feed_dict = get_batch(data_index["train"],batch_size,style=style)
-    feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
-    scale_input.append(sess.run(features,feed_dict))
-    if i%10 == 0: print(str(i))
-scale_input = np.stack(scale_input,axis=0)
-scale_means = scale_input.mean() # just average over everything for now
-scale_stds = scale_input.std()
-print("Mean")
-print(scale_means)
-print("Std")
-print(scale_stds)
+# tf.logging.info("Running preprocessing of input features")
+# scale_input = []
+# for i in range(200):
+#     feed_dict = get_batch(data_index["train"],batch_size,style=style)
+#     feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
+#     scale_input.append(sess.run(features,feed_dict))
+#     if i%10 == 0: print(str(i))
+# scale_input = np.stack(scale_input,axis=0)
+# scale_means = scale_input.mean() # just average over everything for now
+# scale_stds = scale_input.std()
+# print("Mean")
+# print(scale_means)
+# print("Std")
+# print(scale_stds)
 
 
 saver = tf.train.Saver()

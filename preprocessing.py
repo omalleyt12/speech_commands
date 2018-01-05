@@ -6,6 +6,7 @@ from toolz.functoolz import memoize
 from tensorflow.contrib.signal.python.ops import shape_ops
 from tensorflow.contrib.signal.python.ops import reconstruction_ops
 from tensorflow.contrib.signal.python.ops import window_ops
+import acoustics
 
 sample_rate = 16000
 
@@ -25,10 +26,8 @@ def tf_preprocess(wavs,bg_wavs,is_training,slow_down):
 def train_preprocess(tensors):
     wav = tensors[0]
     bg_wav = tensors[1]
-    # wav = tf_pitch_shift(wav)
-    # wav = tf_time_stretch(wav)
     wav = tf_pad(wav)
-    # wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise
+    wav = tf_volume_equalize(wav) # equalize the volume BEFORE adding noise, trying again
     wav = tf_add_noise(wav,bg_wav)
     return tf_volume_equalize(wav) # equalize the volume again AFTER adding noise
 
@@ -255,13 +254,12 @@ def pad(wav):
 def white_noise():
     return (np.clip(np.random.randn(16000,)*0.1,-1,1)).astype(np.float32)
 
-@jit
-def red_noise(r=0.5):
+def red_noise(white_noise,r=0.5):
     """0 < r < 1, zero is white noise, bigger r shifts more towards lower frequencies"""
-    white = white_noise()
+    white = white_noise
     red = np.zeros((16000),dtype=np.float32)
     red[0] = white[0]
-    for i,ele in enumerate(white):
+    for i,ele in enumerate(white[:-1]):
         red[i+1] = r*red[i] + ((1-r**2)**0.5)*white[i+1]
     return red
 
@@ -305,20 +303,29 @@ def red_noise(r=0.5):
 #         bg_volume = 0
 #     return bg_volume*bg_combined
 
-def get_noise(bg_data):
-    background_frequency = 0.8
-    max_background_volume = 0.1
-    bg_index = np.random.randint(len(bg_data))
-    bg_samp = bg_data[bg_index]
-    bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
-    bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
-    if np.random.uniform(0,1) < background_frequency:
-        bg_volume = np.random.uniform(0,max_background_volume)
-    else:
-        bg_volume = 0
-    return bg_volume*bg_sliced
+# def get_noise(bg_data):
+#     background_frequency = 0.8
+#     max_background_volume = 0.1
+#     bg_index = np.random.randint(len(bg_data))
+#     bg_samp = bg_data[bg_index]
+#     bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
+#     bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
+#     if np.random.uniform(0,1) < background_frequency:
+#         bg_volume = np.random.uniform(0,max_background_volume)
+#     else:
+#         bg_volume = 0
+#     return bg_volume*bg_sliced
 
-def get_new_noise(bg_data):
+augmentation_noises = []
+for color in ["white","blue","violet","pink","brown"]:
+    augmentation_noises.append(acoustics.generator.noise(16000*1000,color).astype(np.float32))
+for r in [.25,.5,.75]:
+    augmentation_noises.append(red_noise(augmentation_noises[0],r))
+
+def get_noise(bg_data,val=False):
+    """This method uses the same SNR ratio distribution (after equalizing volumes) as the original method, and should just have better results with the augmented noise"""
+    if not val: # don't validate the silence labels based on my made up noise, since it might be easier to classify and give me false hope
+        bg_data += augmentation_noises
     control_volume = 0.1
     background_frequency = 0.8
     if np.random.uniform(0,1) > background_frequency:
@@ -326,13 +333,13 @@ def get_new_noise(bg_data):
     else:
         # this will give NSRs (inverse of SNR) of truncated exponentially distributed around mean 0.03
         exp_mean = 30
-        cdf = np.random.random(205)*0.97
+        cdf = np.random.random()*0.99
         bg_volume = -np.log(1 - cdf)/exp_mean
     bg_index = np.random.randint(len(bg_data))
     bg_samp = bg_data[bg_index]
     bg_offset = np.random.randint(0,len(bg_samp) - sample_rate)
     bg_sliced = bg_samp[bg_offset:(bg_offset + sample_rate)]
-    bg_sliced = bg_sliced*bg_volume*0.1/np.sqrt(np.mean(bg_sliced**2))
+    bg_sliced = bg_sliced*bg_volume*control_volume/np.sqrt(np.mean(bg_sliced**2))
     return np.clip(bg_sliced,-1.0,1.0)
 
 
