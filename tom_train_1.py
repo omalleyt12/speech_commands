@@ -34,7 +34,7 @@ style = "unknown"
 train_keep_prob = 0.5
 batch_size = 100
 eval_step = 500
-steps = 2
+steps = 200000
 learning_rate = 0.01
 # decay_every = 2000
 decay_rate = 0.10
@@ -43,10 +43,10 @@ silence_percentage = 10.0 # what percent of training data should be silence
 unknown_percentage = 10.0 # what percent of training data should be unknown words
 true_unknown_percentage = 10.0 # what percent of words should be complete goobledyguk
 
-np.random.seed(0)
-tf.set_random_seed(0)
 
 sess = tf.InteractiveSession()
+np.random.seed(0)
+tf.set_random_seed(0)
 from keras import backend as K
 K.set_session(sess)
 
@@ -307,8 +307,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_maxout",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_maxout",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_real_slowdown",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_real_slowdown",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)

@@ -125,7 +125,7 @@ def conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME",mp=No
     """
     if bn:
         c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,padding=padding,activation_fn=None)
-        c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.9)
+        c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.95)
         c = tf.nn.relu(c)
     else:
         c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,padding=padding)
@@ -202,11 +202,11 @@ def overdrive_bn(features,keep_prob,num_final_neurons,is_training):
 def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
-    c = maxout_conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
-    c = maxout_conv2d(c,128,[1,7],is_training,mp=[1,4])
+    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,128,[1,7],is_training,mp=[1,4])
 
-    c = maxout_conv2d(c,256,[1,10],is_training,padding="VALID")
-    c = maxout_conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
 
     c = tf.contrib.layers.flatten(c)
 

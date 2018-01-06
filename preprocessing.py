@@ -18,7 +18,7 @@ def tf_preprocess(wavs,bg_wavs,is_training,slow_down):
         return tf.map_fn(train_preprocess,[wavs,bg_wavs],parallel_iterations=120,dtype=tf.float32,back_prop=False)
 
     def testing_process(wavs):
-        wavs = tf.cond(slow_down,lambda: fast_time_stretch(wavs,constant=True),lambda: tf.identity(wavs))
+        wavs = tf.cond(slow_down,lambda: fast_time_stretch(wavs,constant=True),lambda: wavs)
         return tf.map_fn(test_preprocess,wavs,parallel_iterations=120,back_prop=False)
 
     return tf.cond(is_training,lambda: training_process(wavs,bg_wavs), lambda: testing_process(wavs))
@@ -58,7 +58,7 @@ def fast_time_stretch(signals,constant=False):
     framed_signals = shape_ops.frame(signals, frame_length, frame_step_in,pad_end=False)
     framed_signals *= hann_window
     # return tf.map_fn(overlap,[framed_signals,frame_step_out,resample_x],parallel_iterations=120,back_prop=False,dtype=tf.float32,infer_shape=False)
-    return tf.map_fn(overlap,[framed_signals,frame_step_out],parallel_iterations=120,back_prop=False,dtype=tf.float32,infer_shape=False)
+    return tf.map_fn(overlap,[framed_signals,frame_step_out],parallel_iterations=120,back_prop=False,dtype=tf.float32)
 
 def fast_pitch_shift(signals):
     def resample(tup):
