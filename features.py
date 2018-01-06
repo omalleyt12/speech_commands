@@ -53,10 +53,18 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128,energies=False):
         # Warp the linear-scale, magnitude spectrograms into the mel-scale.
         num_spectrogram_bins = magnitude_spectrograms.shape[-1].value
         lower_edge_hertz, upper_edge_hertz, num_mel_bins = 0.0, 8000.0, bins
+        def individual_vtlp(spec):
+            linear_to_mel_weight_matrix = mel_matrix.linear_to_mel_weight_matrix(
+                num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz,
+                upper_edge_hertz,is_training)
+            spec = tf.tensordot(spec,linear_to_mel_weight_matrix,[1,0])
+            return spec
+        # still keep this here for shape inference I guess
         linear_to_mel_weight_matrix = mel_matrix.linear_to_mel_weight_matrix(
           num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz,
             upper_edge_hertz,is_training)
-        mel_spectrograms = tf.tensordot(magnitude_spectrograms, linear_to_mel_weight_matrix, 1)
+        # mel_spectrograms = tf.tensordot(magnitude_spectrograms, linear_to_mel_weight_matrix, 1)
+        mel_spectrograms = tf.map_fn(individual_vtlp,magnitude_spectrograms,parallel_iterations=120,back_prop=False)
         # Note: Shape inference for `tf.tensordot` does not currently handle this case.
         mel_spectrograms.set_shape(magnitude_spectrograms.shape[:-1].concatenate(linear_to_mel_weight_matrix.shape[-1:]))
         log_offset = 1e-6
