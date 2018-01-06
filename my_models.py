@@ -202,7 +202,7 @@ def overdrive_bn(features,keep_prob,num_final_neurons,is_training):
 def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
-    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+    c = conv2d(fingerprint_4d,64,[11,3],is_training,mp=[1,3])
     c = conv2d(c,128,[1,7],is_training,mp=[1,4])
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
