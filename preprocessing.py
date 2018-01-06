@@ -41,7 +41,7 @@ def fast_time_stretch(signals,constant=False):
         return tf_resample(new_wav)
 
     speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
-    pitch = tf.truncated_normal([tf.shape(signals[0])],0.0,2.0)
+    pitch = tf.truncated_normal([tf.shape(signals)[0]],0.0,2.0)
     frame_length = 300
     frame_step_in = int(300*0.25)
     resample_x = 2**(pitch/12)
