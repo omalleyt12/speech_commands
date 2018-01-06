@@ -33,23 +33,21 @@ def train_preprocess(tensors):
 def test_preprocess(wav):
     return tf_volume_equalize(wav)
 
+
 def fast_time_stretch(signals,constant=False):
     def overlap(tup):
-        framed_signals, frame_step_out, resample_x = tup
+        framed_signals, frame_step_out = tup
         new_wav = reconstruction_ops.overlap_and_add(framed_signals,frame_step_out)
-        new_wav = tf_get_word(new_wav,size=tf.cast(16000*resample_x,tf.int32))
-        return tf_resample(new_wav)
+        return tf_get_word(new_wav)
 
     speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
-    pitch = tf.truncated_normal([tf.shape(signals)[0]],0.0,2.0)
     frame_length = 300
     frame_step_in = int(300*0.25)
-    resample_x = 2**(pitch/12)
-    frame_step_out = tf.cast(speedx*resample_x*frame_step_in,tf.int32)
+    frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)
     hann_window = window_ops.hann_window(frame_length)
     framed_signals = shape_ops.frame(signals, frame_length, frame_step_in,pad_end=False)
     framed_signals *= hann_window
-    return tf.map_fn(overlap,[framed_signals,frame_step_out,resample_x],parallel_iterations=120,back_prop=False,dtype=tf.float32,infer_shape=False)
+    return tf.map_fn(overlap,[framed_signals,frame_step_out],parallel_iterations=120,back_prop=False,dtype=tf.float32)
 
 # def fast_pitch_shift(signals):
 #     def resample(tup):
