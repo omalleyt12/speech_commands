@@ -377,6 +377,7 @@ offset = 0
 test_batch_size = batch_size
 test_info = []
 while offset < len(test_index):
+    if offset % 1000 == 0: print(str(offset))
     # print(offset)
     feed_dict = get_batch(test_index,test_batch_size,offset=offset,mode="comp",style=style)
     feed_dict.update({ keep_prob:1.0,is_training_ph:False})
