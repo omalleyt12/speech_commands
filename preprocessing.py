@@ -47,7 +47,7 @@ def fast_time_stretch(signals,constant=False):
         speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
         # pitch = tf.truncated_normal([tf.shape(signals[0])],0.0,2)
     else:
-        speedx = tf.constant(np.repeat(1.15,signals.shape[0]).astype(np.float32))
+        speedx = tf.truncated_normal([tf.shape(signals)[0]],1.15,0.0001) # literally can't figure out a way to do tf.repeat
         # pitch = tf.constant(np.repeat(0,signals.shape[0]).astype(np.float32))
     frame_length = 300
     frame_step_in = int(300*0.25)
