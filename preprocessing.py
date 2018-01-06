@@ -51,21 +51,21 @@ def fast_time_stretch(signals,constant=False):
     framed_signals *= hann_window
     return tf.map_fn(overlap,[framed_signals,frame_step_out,resample_x],parallel_iterations=120,back_prop=False,dtype=tf.float32,infer_shape=False)
 
-def fast_pitch_shift(signals):
-    def resample(tup):
-        framed_signals, frame_step_out = tup
-        new_wav = reconstruction_ops.overlap_and_add(framed_signals,frame_step_out)
-        return tf_resample(new_wav)
+# def fast_pitch_shift(signals):
+#     def resample(tup):
+#         framed_signals, frame_step_out = tup
+#         new_wav = reconstruction_ops.overlap_and_add(framed_signals,frame_step_out)
+#         return tf_resample(new_wav)
 
-    pitch = tf.random_uniform([tf.shape(signals)[0]],-3,3)
-    frame_length = 300
-    frame_step_in = int(300*0.25)
-    resample_x = 2**(pitch/12)
-    frame_step_out = tf.cast(frame_step_in*resample_x,tf.int32)
-    hann_window = window_ops.hann_window(frame_length)
-    framed_signals = shape_ops.frame(signals, frame_length, frame_step_in,pad_end=False)
-    framed_signals *= hann_window
-    return tf.map_fn(resample,[framed_signals,frame_step_out],parallel_iterations=120,back_prop=False,dtype=tf.float32,infer_shape=False)
+#     pitch = tf.random_uniform([tf.shape(signals)[0]],-3,3)
+#     frame_length = 300
+#     frame_step_in = int(300*0.25)
+#     resample_x = 2**(pitch/12)
+#     frame_step_out = tf.cast(frame_step_in*resample_x,tf.int32)
+#     hann_window = window_ops.hann_window(frame_length)
+#     framed_signals = shape_ops.frame(signals, frame_length, frame_step_in,pad_end=False)
+#     framed_signals *= hann_window
+#     return tf.map_fn(resample,[framed_signals,frame_step_out],parallel_iterations=120,back_prop=False,dtype=tf.float32,infer_shape=False)
 
 def tf_pitch_shift(wav):
     pitch = tf.truncated_normal([],0,3)
@@ -105,12 +105,17 @@ def tf_batch_time_stretch(wavs):
     a = tf.contrib.signal.inverse_stft(s,frame_length,frame_step_out)
     return tf.map_fn(tf_get_word,wavs,parallel_iterations=120,back_prop=False)
 
-def tf_get_word(wav,size=16000):
+def tf_get_word(wav,size=16000,indices=False):
     frames = shape_ops.frame(wav,size,300,pad_end=True)
     frame_stack = tf.stack(frames)
     frame_vols = tf.reduce_mean(tf.pow(frame_stack,2),axis=1)
     max_frame_vol = tf.argmax(frame_vols)
-    return frame_stack[max_frame_vol,:]
+    if not indices:
+        return frame_stack[max_frame_vol,:]
+    else:
+        start_index = max_frame_vol*300
+        end_index = max_frame_vol*300 + 16000
+        return start_index, end_index
 
 def tf_pad(wav):
     """This NEEDS to be done better"""
@@ -120,6 +125,10 @@ def tf_pad(wav):
     wav = tf_get_word(wav,word_frame_size)
     wav = tf.pad(wav,[[left_pad,right_pad]])
     return wav
+
+def tf_new_pad(wav):
+    word_frame_size = tf.random_uniform([],12000,16000,dtype=tf.int32)
+    start_index, _ = tf_get_word(wav,word_frame_size,True)
 
 def tf_simple_pad(wav):
     pad = tf.random_uniform([],-100,100,dtype=tf.int32)
@@ -315,7 +324,7 @@ def get_noise(bg_data,val=False):
         bg_volume = 0
     return bg_volume*bg_sliced
 
-# augmentation_noises = []
+ # augmentation_noises = []
 # for color in ["white","blue","violet","pink","brown"]:
 #     augmentation_noises.append(acoustics.generator.noise(16000*1000,color).astype(np.float32))
 # for r in [.25,.5,.75]:
