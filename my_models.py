@@ -103,8 +103,16 @@ def drive_conv_log_mel(features,keep_prob,num_final_neurons,is_training):
 
     return final_layer
 
-
-
+def maxout_conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME",mp=None):
+    """A convolutional maxout layer. Not sure if I should have dropout on this layer too, and if batchnorm should go before or after...hmm actually I think after"""
+    # use twice as many channels, since we will halve it by using maxout
+    c = tf.contrib.layers.conv2d(x,channels*2,kernel_size,strides,padding=padding,activation_fn=None)
+    c = tf.contrib.layers.maxout(c,channels)
+    c.set_shape(c.shape[:-1].concatenate(channels))
+    c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.95)
+    if mp is not None:
+        c = tf.nn.max_pool(c,[1,mp[0],mp[1],1],[1,mp[0],mp[1],1],"VALID")
+    return c
 
 
 def conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME",mp=None,bn=True):
@@ -194,11 +202,11 @@ def overdrive_bn(features,keep_prob,num_final_neurons,is_training):
 def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
-    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
-    c = conv2d(c,128,[1,7],is_training,mp=[1,4])
+    c = maxout_conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+    c = maxout_conv2d(c,128,[1,7],is_training,mp=[1,4])
 
-    c = conv2d(c,256,[1,10],is_training,padding="VALID")
-    c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
+    c = maxout_conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = maxout_conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
 
     c = tf.contrib.layers.flatten(c)
 
