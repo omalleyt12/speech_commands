@@ -146,10 +146,10 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         if style != "full":
             unknown_recs = int(batch_size * unknown_percentage / 100)
             for j in range(unknown_recs):
-                if mode == "val": # Try and make val more deterministic
-                    rand_unknown = offset + j
-                else:
-                    rand_unknown = np.random.randint(0,len(unknown_index[mode]))
+                # if mode == "val": # Try and make val more deterministic
+                #     rand_unknown = offset + j
+                # else:
+                rand_unknown = np.random.randint(0,len(unknown_index[mode]))
                 u_rec = unknown_index[mode][rand_unknown]["data"]
                 recs.append(u_rec)
                 labels.append(1)
@@ -219,13 +219,21 @@ def run_validation(set_name,step):
 
 
 data_index, unknown_index = load_train_data(style=style)
+print("Length of unknown_index for train {}".format(len(unknown_index["train"])))
+print("Length of training data {}".format(len(data_index["train"])))
 # full_data_index, _ = load_train_data("full")
 speakers = get_speakers(unknown_index,data_index)
 bg_data = wl.load_bg_data(sess)
 
+with tf.name_scope("decoded_sample_data") as scope:
+    rasbpi_ph0 = tf.placeholder_with_default(np.zeros((16000,1),np.float32),[16000,1],name=None)
+    rasbpi_ph1 = tf.placeholder_with_default(16000,[],name=None)
+
+
 labels_ph = tf.placeholder(tf.int32,(None))
 wav_ph = tf.placeholder(tf.float32,(None,sample_rate))
 bg_wavs_ph = tf.placeholder(tf.float32,[None,sample_rate])
+
 keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
 is_training_ph = tf.placeholder(tf.bool)
@@ -236,16 +244,16 @@ slow_down = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph,slow_down)
 
-features = make_features(processed_wavs,is_training_ph,"log-mel")
+features = make_features(processed_wavs,is_training_ph,"multi-mels")
 # scaled_features = tf.cond(scale_features,lambda: )
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 full_output_neurons = len(all_words)
-final_layer, full_final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
+final_layer, full_final_layer, open_max_layer = mega_multi_mel_model(features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
 
 final_layer = tf.cond(use_full_layer,lambda: full_final_layer, lambda: final_layer)
 
-probabilities = tf.nn.softmax(final_layer)
+probabilities = tf.nn.softmax(final_layer,name="labels_softmax:0")
 
 loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
 full_loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph,logits=full_final_layer)
@@ -269,8 +277,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_nothing_cut",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_nothing_cut",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_mega_multi_mels",sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_mega_multi_mels",sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -338,6 +346,7 @@ df = pd.DataFrame([],columns=["fname","label"])
 offset = 0
 test_batch_size = batch_size
 test_info = []
+test_ladder_info = []
 while offset < len(test_index):
     if offset % 1000 == 0: print(str(offset))
     # print(offset)
@@ -349,6 +358,14 @@ while offset < len(test_index):
     # feed_dict.update({keep_prob:1.0,is_training_ph:False,slow_down:True})
     # test_prob_slow = sess.run(probabilities,feed_dict)
     # test_pred = (test_prob + test_prob_slow).argmax(axis=1)
+
+    # use this to ladder up on the silence and unknown labels
+    for i in range(len(list(test_pred))):
+        test_ladder_info.append({
+            "guess":wanted_words[test_pred[i]],
+            "data":feed_dict[wav_ph][i],
+            "prob":test_prob[i].max()
+        })
 
 
     test_labels = [all_words[test_index] for test_index in test_pred]
@@ -363,6 +380,8 @@ while offset < len(test_index):
 df.to_csv("my_guesses_3.csv",index=False)
 pd.DataFrame(test_info).to_csv("test_mav_info.csv")
 sess.close()
+with open("test_ladder_info.pickle","wb") as f:
+    pickle.dump(test_ladder_info,f)
 
 from twilio.rest import Client
 

@@ -223,12 +223,62 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neuron
     return final_layer, full_final_layer, fc
 
 def overdrive_multi_mels(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
-    """This will use initially use features that are 4, 128-bin log mel spectrograms of various window lengths"""
+    """This will use initially use features that are 4, 120-bin log mel spectrograms of various window lengths"""
+    print("Using Overdrive Multi Mels Model")
+    print(features.shape)
     c = conv2d(features,64,[7,3],is_training,mp=[1,3])
+    print(c.shape)
     c = conv2d(c,128,[1,7],is_training,mp=[1,4])
+    print(c.shape)
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    print(c.shape)
     c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
+    print(c.shape)
+
+    c = tf.contrib.layers.flatten(c)
+    print(c.shape)
+
+    fc = tf.contrib.slim.fully_connected(c,256)
+    print(fc.shape)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons,activation_fn=None)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(final_layer.shape)
+    return final_layer, full_final_layer, fc
+
+def mega_multi_mel_model(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """Use 4 5ms sliding window, 256 bin log mel spectrograms"""
+    print(features.shape)
+
+    c = conv2d(features,32,[3,3],is_training)
+    c = conv2d(c,16,[1,1],is_training)
+    c = conv2d(c,32,[3,3],is_training,mp=[1,2])
+    print(c.shape)
+
+    c = conv2d(c,64,[3,3],is_training)
+    c = conv2d(c,48,[1,1],is_training,mp=[2,2])
+    print(c.shape)
+
+    c = conv2d(c,96,[5,3],is_training)
+    c = conv2d(c,64,[1,1],is_training,mp=[1,2])
+    print(c.shape)
+
+    c = conv2d(c,128,[5,3],is_training)
+    c = conv2d(c,96,[1,1],is_training,mp=[1,2])
+    print(c.shape)
+
+    c = conv2d(c,192,[5,3],is_training)
+    c = conv2d(c,128,[1,1],is_training,mp=[1,2])
+    print(c.shape)
+
+    c = conv2d(c,256,[1,8],is_training)
+    c = conv2d(c,512,[7,1],is_training)
+
 
     c = tf.contrib.layers.flatten(c)
 
@@ -242,6 +292,8 @@ def overdrive_multi_mels(features,keep_prob,num_final_neurons,num_full_final_neu
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
     print(c.shape)
     return final_layer, full_final_layer, fc
+
+
 
 
 

@@ -13,6 +13,12 @@ def make_features(wavs,is_training,name="log-mel"):
     if name == "log-mel":
         print("Features: Log Mel")
         return make_vtlp_mels(wavs,is_training,bins=120)
+    elif name == "multi-mels":
+        print("Using Multi Mels")
+        return multi_mels(wavs,is_training,stride_ms=10)
+    elif name == "mega-multi-mels":
+        print("Using Mega-Multi-Mels")
+        return multi_mels(wavs,is_training,bins=256,stride_ms=5)
     elif name == "log-mel-40":
         return make_vtlp_mels(wavs,is_training,bins=40)
     elif name == "mfcc":
@@ -71,11 +77,11 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128):
         #     return tf.concat([frame_energies,log_mel_spectrograms],axis=2)
         return log_mel_spectrograms
 
-def multi_mels(sig,is_training,name=None,bins=120):
+def multi_mels(sig,is_training,name=None,bins=120,stride_ms=5):
     with tf.name_scope(name,"multi-mels",[sig]) as scope:
         # ensure each spectrogram is VTLP'd the same way
         vtlp = tf.cond(is_training,lambda: tf.truncated_normal([],1.0,0.1,dtype=tf.float64), lambda: tf.constant(1.0,tf.float64))
-        window_stride_samples = 10 * 16
+        window_stride_samples = stride_ms * 16
         mels_list = []
         for window_size_ms in [8,16,32,64]:
             window_size_samples = window_size_ms * 16

@@ -6,7 +6,7 @@ from toolz.functoolz import memoize
 from tensorflow.contrib.signal.python.ops import shape_ops
 from tensorflow.contrib.signal.python.ops import reconstruction_ops
 from tensorflow.contrib.signal.python.ops import window_ops
-import acoustics
+# import acoustics
 
 sample_rate = 16000
 
