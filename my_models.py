@@ -200,6 +200,7 @@ def overdrive_bn(features,keep_prob,num_final_neurons,is_training):
     return final_layer
 
 def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """This is actually cutting off the last 8 bands! Change to 120 mel bands to fix"""
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
     c = conv2d(fingerprint_4d,64,[11,3],is_training,mp=[1,3])
@@ -220,6 +221,46 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neuron
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
     print(c.shape)
     return final_layer, full_final_layer, fc
+
+def overdrive_lws(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """
+    Trying Local Weight Sharing for different ranges of Log Mel Freq bands
+    For this methodology to work, will need 124 log mel spec
+    """
+    f = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+    f_slices = []
+    for i in range(10):
+        start = i*12
+        end = start + 16
+        sliced = f[:,:,start:end,:]
+        sliced = tf.pad(sliced,[[0,0],[5,5],[0,0],[0,0]])
+        c = conv2d(sliced,64,[11,3],is_training,padding="VALID",mp=[1,3])
+        if i == 0:
+            print(c.shape)
+        c = conv2d(c,128,[1,4],is_training,mp=[1,4])
+        if i == 0:
+            print(c.shape)
+        f_slices.append(c)
+    print(f_slices[0].shape)
+    c = tf.concat(f_slices,axis=2)
+    print(c.shape)
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
+
+    c = tf.contrib.layers.flatten(c)
+
+    fc = tf.contrib.slim.fully_connected(c,256)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons,activation_fn=None)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(c.shape)
+    return final_layer, full_final_layer, fc
+
 
 
 def overdrive_full_bn_energies(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
