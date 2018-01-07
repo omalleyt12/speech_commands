@@ -12,7 +12,7 @@ window_stride_samples = 10 * 16
 def make_features(wavs,is_training,name="log-mel"):
     if name == "log-mel":
         print("Features: Log Mel")
-        return make_vtlp_mels(wavs,is_training,bins=124)
+        return make_vtlp_mels(wavs,is_training,bins=120)
     elif name == "log-mel-40":
         return make_vtlp_mels(wavs,is_training,bins=40)
     elif name == "mfcc":
