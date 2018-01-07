@@ -228,13 +228,14 @@ def overdrive_lws(features,keep_prob,num_final_neurons,num_full_final_neurons,is
     For this methodology to work, will need 124 log mel spec
     """
     f = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+    # shape these into overlapping slices and conv each slice separately
     f_slices = []
     for i in range(10):
         start = i*12
         end = start + 16
         sliced = f[:,:,start:end,:]
-        sliced = tf.pad(sliced,[[0,0],[5,5],[0,0],[0,0]])
-        c = conv2d(sliced,64,[11,3],is_training,padding="VALID",mp=[1,3])
+        sliced = tf.pad(sliced,[[0,0],[3,3],[0,0],[0,0]])
+        c = conv2d(sliced,64,[7,3],is_training,padding="VALID",mp=[1,3])
         if i == 0:
             print(c.shape)
         c = conv2d(c,128,[1,4],is_training,mp=[1,4])
