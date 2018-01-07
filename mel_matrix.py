@@ -48,7 +48,7 @@ def _mel_to_hertz(mel_values, name=None):
     )
 
 
-def _hertz_to_mel(frequencies_hertz, is_training=tf.constant(False),name=None,sampling_rate=16000):
+def _hertz_to_mel(frequencies_hertz, vtlp=tf.constant(1.0,tf.float64),name=None,sampling_rate=16000):
   """Converts frequencies in `frequencies_hertz` in Hertz to the mel scale.
   Args:
     frequencies_hertz: A `Tensor` of frequencies in Hertz.
@@ -57,11 +57,11 @@ def _hertz_to_mel(frequencies_hertz, is_training=tf.constant(False),name=None,sa
     A `Tensor` of the same shape and type of `frequencies_hertz` containing
     frequencies in the mel scale.
   """
-  vtlp_a = tf.truncated_normal([],1.0,0.1,dtype=tf.float64)
+  vtlp_a = vtlp
   vtlp_f = tf.cast(4800,tf.float64)
   with ops.name_scope(name, 'hertz_to_mel', [frequencies_hertz]):
     frequencies_hertz = ops.convert_to_tensor(frequencies_hertz)
-    def vtlp(frequencies_hertz):
+    def vtlp_distort(frequencies_hertz):
         max_freq = tf.cast(sampling_rate / 2.0,tf.float64)
         vtlp_numerator = max_freq - vtlp_f*tf.minimum(vtlp_a,1)
         vtlp_denominator = max_freq - vtlp_f*tf.minimum(vtlp_a,1)/vtlp_a
@@ -69,7 +69,7 @@ def _hertz_to_mel(frequencies_hertz, is_training=tf.constant(False),name=None,sa
         above_cutoff_distortion = max_freq - (vtlp_numerator/vtlp_denominator)*(max_freq - frequencies_hertz)
         frequencies_hertz = tf.where(frequencies_hertz <= vtlp_f, below_cutoff_distortion, above_cutoff_distortion)
         return frequencies_hertz
-    frequencies_hertz = tf.cond(is_training,lambda: vtlp(frequencies_hertz), lambda: tf.identity(frequencies_hertz))
+    frequencies_hertz = tf.cond(tf.not_equal(vtlp,tf.constant(1.0,tf.float64)),lambda: vtlp_distort(frequencies_hertz), lambda: tf.identity(frequencies_hertz))
     return _MEL_HIGH_FREQUENCY_Q * math_ops.log(
         1.0 + (frequencies_hertz / _MEL_BREAK_FREQUENCY_HERTZ))
 
@@ -99,7 +99,7 @@ def linear_to_mel_weight_matrix(num_mel_bins=20,
                                 sample_rate=8000,
                                 lower_edge_hertz=125.0,
                                 upper_edge_hertz=3800.0,
-                                is_training=False,
+                                vtlp=tf.constant(1.0,tf.float64),
                                 dtype=dtypes.float32,
                                 name=None):
   """Returns a matrix to warp linear scale spectrograms to the [mel scale][mel].
@@ -135,7 +135,7 @@ def linear_to_mel_weight_matrix(num_mel_bins=20,
       lowest triangular band.
     upper_edge_hertz: Python float. The desired top edge of the highest
       frequency band.
-    is_training: if True, implement Vocal Tract Length Perturbation
+    vtlp: The Vocal Tract Length Perturbation amount, default 1.0 for no perturbation
     vtlp_f: The cutoff frequency Fhi as in Jaitly, Hinton
     dtype: The `DType` of the result matrix. Must be a floating point type.
     name: An optional name for the operation.
@@ -169,7 +169,7 @@ def linear_to_mel_weight_matrix(num_mel_bins=20,
         zero_float64, nyquist_hertz, num_spectrogram_bins)[bands_to_zero:]
     # will apply Vocal Tract Length Perturbation if vltp is not None
     spectrogram_bins_mel = array_ops.expand_dims(
-        _hertz_to_mel(linear_frequencies,is_training), 1)
+        _hertz_to_mel(linear_frequencies,vtlp), 1)
 
     # Compute num_mel_bins triples of (lower_edge, center, upper_edge). The
     # center of each band is the lower and upper edge of the adjacent bands.

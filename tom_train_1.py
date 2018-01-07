@@ -147,7 +147,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
             unknown_recs = int(batch_size * unknown_percentage / 100)
             for j in range(unknown_recs):
                 if mode == "val": # Try and make val more deterministic
-                    rand_unknown = j
+                    rand_unknown = offset + j
                 else:
                     rand_unknown = np.random.randint(0,len(unknown_index[mode]))
                 u_rec = unknown_index[mode][rand_unknown]["data"]
