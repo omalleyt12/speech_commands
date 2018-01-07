@@ -23,7 +23,6 @@ def make_features(wavs,is_training,name="log-mel"):
         return wavs
 
 # Different features from preprocessing
-# this will generate 64 features
 def make_log_mel_fb(sig,name=None):
     with tf.name_scope(name,"audio_processing",[sig]) as scope:
         stfts = tf.contrib.signal.stft(sig, frame_length=window_size_samples, frame_step=window_stride_samples,fft_length=1024)
@@ -41,9 +40,8 @@ def make_log_mel_fb(sig,name=None):
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
         return log_mel_spectrograms
 
-def make_vtlp_mels(sig,is_training,name=None,bins=128,frame_stride_ms=10):
+def make_vtlp_mels(sig,is_training,name=None,bins=128):
     """A limitation with this approach is that the VTLP factor is the same within a batch, but individual VTLP did NOT help, so there's that"""
-    window_stride_samples = frame_stride_ms*16
     with tf.name_scope(name,"audio_processing",[sig]) as scope:
         stfts = tf.contrib.signal.stft(sig, frame_length=window_size_samples, frame_step=window_stride_samples,fft_length=1024,pad_end=True)
         magnitude_spectrograms = tf.abs(stfts)

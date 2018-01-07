@@ -115,18 +115,21 @@ def tf_get_word(wav,size=16000,indices=False):
         end_index = max_frame_vol*300 + 16000
         return start_index, end_index
 
-def tf_pad(wav):
-    """This NEEDS to be done better"""
-    word_frame_size = tf.random_uniform([],12000,16000,dtype=tf.int32)
-    left_pad = tf.random_uniform([],0,16000 - word_frame_size,dtype=tf.int32)
-    right_pad = 16000 - word_frame_size - left_pad
-    wav = tf_get_word(wav,word_frame_size)
-    wav = tf.pad(wav,[[left_pad,right_pad]])
-    return wav
+# def tf_pad(wav):
+#     """This NEEDS to be done better"""
+#     word_frame_size = tf.random_uniform([],12000,16000,dtype=tf.int32)
+#     left_pad = tf.random_uniform([],0,16000 - word_frame_size,dtype=tf.int32)
+#     right_pad = 16000 - word_frame_size - left_pad
+#     wav = tf_get_word(wav,word_frame_size)
+#     wav = tf.pad(wav,[[left_pad,right_pad]])
+#     return wav
 
-def tf_new_pad(wav):
+def tf_pad(wav):
     word_frame_size = tf.random_uniform([],12000,16000,dtype=tf.int32)
+    amount_cut = 16000 - word_frame_size
     start_index, _ = tf_get_word(wav,word_frame_size,True)
+    wrap_start = tf.random_uniform([],start_index - amount_cut, start_index)
+    return tf.concat(wav[wrap_start:],wav[:wrap_start])
 
 def tf_simple_pad(wav):
     pad = tf.random_uniform([],-100,100,dtype=tf.int32)

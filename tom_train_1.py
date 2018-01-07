@@ -175,6 +175,8 @@ def run_validation(set_name,step):
     val_loss = RunningAverage()
     val_conf_mat = np.zeros((output_neurons,output_neurons))
     pred_df_list = []
+    errors = []
+    got_ems = []
     while val_offset < val_size:
         feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
         feed_dict.update({keep_prob:1.0,is_training_ph:False})
@@ -185,55 +187,26 @@ def run_validation(set_name,step):
         val_conf_mat += val_conf_mat_val
         val_offset += batch_size
         val_pred_list = list(val_pred)
-        for val_rec,val_p in zip(data_index[set_name][val_offset:val_offset+batch_size],val_pred_list[:batch_size]):
-            pred_df_list.append({
-                "true_label":val_rec["label"],
-                "true_word":val_rec["word"],
-                "pred_label":all_words[val_p],
-                "file":val_rec["file"]
-            })
-        silence_end = batch_size + int(batch_size * silence_percentage / 100)
-        for val_p in val_pred_list[batch_size:silence_end]:
-            pred_df_list.append({
-                "true_label":"silence",
-                "true_word":"silence",
-                "pred_label":all_words[val_p],
-                "file":None
-            })
-        for val_p in val_pred_list[silence_end:]:
-            pred_df_list.append({
-                "true_label":"unknown",
-                "true_word":"unknown",
-                "pred_label":all_words[val_p],
-                "file":None
-            })
-        if set_name == "train":
-            for i,p in enumerate(val_pred):
-                if val_correct[i]:
-                    # only care about the direction of the unit-normed vector
-                    open_max_vector = open_max[i,:]
-                    normed_open_max_vector = open_max_vector/np.linalg.norm(open_max_vector)
-                    AVs[p].append(normed_open_max_vector)
-    if set_name == "train":
-        MAVs = {}
-        DAVs = defaultdict(list)
-        MR_MODELS = {}
-        for c in AVs.keys():
-            MAVs[c] = np.stack(AVs[c]).mean(axis=0)
-            for v in AVs[c]:
-                DAVs[c].append(spd.cosine(v,MAVs[c]))
-            mr = libmr.MR()
-            biggest_true_distances = sorted(DAVs[c])[-20:]
-            mr.fit_high(biggest_true_distances,len(biggest_true_distances))
-            MR_MODELS[c] = mr
-        with open("MAVs.pickle","wb") as f:
-            pickle.dump(MAVs,f)
-        with open("AVs.pickle","wb") as f:
-            pickle.dump(AVs,f)
-        with open("DAVs.pickle","wb") as f:
-            pickle.dump(DAVs,f)
-        with open("MR_MODELS.pickle","wb") as f:
-            pickle.dump(MR_MODELS,f)
+
+        for i,guess in enumerate(list(val_correct)):
+            if not guess:
+                errors.append({
+                    "data":feed_dict[wav_ph][i],
+                    "guess":val_pred[i],
+                    "label":feed_dict[labels_ph][i]
+                })
+            else:
+                got_ems.append({
+                    "data":feed_dict[wav_ph][i],
+                    "guess":val_pred[i],
+                    "label":feed_dict[labels_ph][i]
+                })
+
+
+    with open("errors_{}".format(set_name),"wb") as f:
+        pickle.dump(errors,f)
+    with open("got_ems_{}".format(set_name),"wb") as f:
+        pickle.dump(got_ems,f)
 
 
     tf.logging.info("{} Step {} LR {} Accuracy {} Loss {}".format(set_name,step,learning_rate,val_acc,val_loss))
@@ -241,19 +214,8 @@ def run_validation(set_name,step):
 
     pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(set_name))
 
-    pd.DataFrame(pred_df_list).to_csv("predictions_{}.csv".format(set_name))
 
-    # get variance for batch normalization layers back to normal
-    # if set_name != "train": # (because train runs at the end and we want this to stick for the Comp set)
-    #     for _ in range(50):
-    #         feed_dict = get_batch(data_index["train"],batch_size,style=style)
-    #         feed_dict.update({keep_prob: 0.8,learning_rate_ph:learning_rate,is_training_ph: True})
-    #         _,_ = sess.run([update_ops,loss_mean],feed_dict)
-
-    if set_name == "train":
-        return MAVs, MR_MODELS
-    else:
-        return val_loss.calculate(), val_acc.calculate()
+    return val_loss.calculate(), val_acc.calculate()
 
 
 data_index, unknown_index = load_train_data(style=style)
@@ -384,17 +346,9 @@ while offset < len(test_index):
     test_av, test_prob, test_pred = sess.run([open_max_layer,probabilities,predictions],feed_dict=feed_dict)
 
     # use this to average over the regular speed and slowed down predictions
-    feed_dict.update({keep_prob:1.0,is_training_ph:False,slow_down:True})
-    test_prob_slow = sess.run(probabilities,feed_dict)
-    test_pred = (test_prob + test_prob_slow).argmax(axis=1)
-
-    # compute and save distances and MR models probabilities
-    for e,p in enumerate(test_pred):
-        cos_dist = spd.cosine(test_av[e],MAVs[p])
-        unknown_prob = MR_MODELS[p].w_score(cos_dist)
-        class_prob = test_prob[e].max()
-        fname = test_index[offset + e]["identifier"]
-        test_info.append({"MAV_distance":cos_dist,"MAV_prob":unknown_prob,"Class_Prob":class_prob,"Class_Guess":p,"File":fname})
+    # feed_dict.update({keep_prob:1.0,is_training_ph:False,slow_down:True})
+    # test_prob_slow = sess.run(probabilities,feed_dict)
+    # test_pred = (test_prob + test_prob_slow).argmax(axis=1)
 
 
     test_labels = [all_words[test_index] for test_index in test_pred]
