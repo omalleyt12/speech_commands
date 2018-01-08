@@ -1,4 +1,4 @@
-save_to = "testing.pb"
+save_to = "simple_testing.pb"
 
 import numpy as np
 import tensorflow as tf
@@ -23,16 +23,18 @@ decoded_sample_data = contrib_audio.decode_wav(
       name='decoded_sample_data')
 
 wavs_ph = tf.reshape(decoded_sample_data.audio,[1,16000])
-processed_wavs = pp.tf_preprocess(wavs_ph,bg_wavs_ph,is_training_ph,slow_down)
-features = ft.make_features(processed_wavs,is_training_ph,"log-mel")
+final_layer = tf.contrib.layers.fully_connected(wavs_ph,12)
+# processed_wavs = pp.tf_preprocess(wavs_ph,bg_wavs_ph,is_training_ph,slow_down)
+# features = ft.make_features(processed_wavs,is_training_ph,"log-mel")
 
-final_layer, _, _ = models.newdrive(features,keep_prob,12,30,is_training_ph)
+# final_layer, _, _ = models.newdrive(features,keep_prob,12,30,is_training_ph)
 
 tf.nn.softmax(final_layer,name="labels_softmax")
 
 sess = tf.InteractiveSession()
-saver = tf.train.Saver()
-saver.restore(sess,"./rasbpi.ckpt")
+sess.run(tf.global_variables_initializer())
+# saver = tf.train.Saver()
+# saver.restore(sess,"rasbpi_models/newdrive/rasbpi.ckpt")
 
 frozen_graph_def = graph_util.convert_variables_to_constants(
       sess, sess.graph_def, ['labels_softmax'])

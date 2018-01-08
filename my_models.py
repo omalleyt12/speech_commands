@@ -115,7 +115,7 @@ def maxout_conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME
     return c
 
 
-def conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME",mp=None,bn=True):
+def conv2d(x,channels,kernel_size,is_training,strides=[1,1],rate=[1,1],padding="SAME",mp=None,bn=True):
     """Make sure to update training ops when using this, can run something like:
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -124,11 +124,11 @@ def conv2d(x,channels,kernel_size,is_training,strides=[1,1],padding="SAME",mp=No
     Also make sure to use the is_training placeholder
     """
     if bn:
-        c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,padding=padding,activation_fn=None)
+        c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,rate=rate,padding=padding,activation_fn=None)
         c = tf.contrib.slim.batch_norm(c,is_training=is_training,decay=0.95)
         c = tf.nn.relu(c)
     else:
-        c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,padding=padding)
+        c = tf.contrib.layers.conv2d(x,channels,kernel_size,strides,rate=rate,padding=padding)
     if mp is not None:
         return tf.nn.max_pool(c,[1,mp[0],mp[1],1],[1,mp[0],mp[1],1],"VALID")
     else:
@@ -222,6 +222,36 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neuron
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
     print(c.shape)
     return final_layer, full_final_layer, fc
+
+def dilated_drive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+    c = fingerprint_4d
+    for dilation in [1,2,4]:
+        c = conv2d(c,32,[7,3],is_training,rate=[dilation,1])
+    c = tf.nn.max_pool(c,[1,3,1,1],[1,3,1,1],"VALID")
+
+    for dilation in [1,2,4]:
+        c = conv2d(c,64,[1,7],is_training,rate=[dilation,1])
+    c = tf.nn.max_pool(c,[1,4,1,1],[1,4,1,1],"VALID")
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
+
+    c = tf.contrib.layers.flatten(c)
+    c = tf.nn.dropout(c,keep_prob)
+
+    fc = tf.contrib.slim.fully_connected(c,256)
+    # fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons,activation_fn=None)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(c.shape)
+    return final_layer, full_final_layer, fc
+
 
 def overdrive_multi_mels(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     """This will use initially use features that are 4, 120-bin log mel spectrograms of various window lengths"""

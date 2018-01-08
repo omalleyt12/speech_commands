@@ -77,6 +77,10 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128):
         #     return tf.concat([frame_energies,log_mel_spectrograms],axis=2)
         return log_mel_spectrograms
 
+def make_vtlp_mfccs(sig,is_training,name=None):
+    """This will be used to mirror Hello Edge architectures on MFCC"""
+    return None
+
 def multi_mels(sig,is_training,name=None,bins=120,stride_ms=5):
     with tf.name_scope(name,"multi-mels",[sig]) as scope:
         # ensure each spectrogram is VTLP'd the same way

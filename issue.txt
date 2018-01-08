@@ -1,0 +1,18 @@
+Hi Pete,
+
+Thank you so much for organizing this competition, it's been a great opportunity for learning more about deep learning on mobile devices.
+
+I have a few small, well-performing models I want to benchmark on my Raspberry Pi, but I believe the benchmark script provided may be out of date (or I am doing something wrong). Some of the models I try running on it give me this error (while other models that do not rely on ````strided_slice```` run successfully):
+
+````Create kernel failed: Invalid argument: NodeDef mentions attr 'identical_element_shapes' not in Op<name=TensorArrayV3; signature=size:int32 -> handle:resource, flow:float; attr=dtype:type; attr=element_shape:shape,default=<unknown>; attr=dynamic_size:bool,default=false; attr=clear_after_read:bool,default=true; attr=tensor_array_name:string,default=""; is_stateful=true>; NodeDef: cond/map/TensorArray = TensorArrayV3[clear_after_read=true, dtype=DT_FLOAT, dynamic_size=false, element_shape=<unknown>, identical_element_shapes=true, tensor_array_name="", _device="/job:localhost/replica:0/task:0/device:CPU:0"](cond/map/strided_slice). (Check whether your GraphDef-interpreting binary is up to date with your GraphDef-generating binary.).
+2018-01-08 17:10:34.215704: E tensorflow/core/common_runtime/executor.cc:651] Executor failed to create kernel. Invalid argument: NodeDef mentions attr 'identical_element_shapes' not in Op<name=TensorArrayV3; signature=size:int32 -> handle:resource, flow:float; attr=dtype:type; attr=element_shape:shape,default=<unknown>; attr=dynamic_size:bool,default=false; attr=clear_after_read:bool,default=true; attr=tensor_array_name:string,default=""; is_stateful=true>; NodeDef: cond/map/TensorArray = TensorArrayV3[clear_after_read=true, dtype=DT_FLOAT, dynamic_size=false, element_shape=<unknown>, identical_element_shapes=true, tensor_array_name="", _device="/job:localhost/replica:0/task:0/device:CPU:0"](cond/map/strided_slice). (Check whether your GraphDef-interpreting binary is up to date with your GraphDef-generating binary.).````
+
+
+Please let me know what I can do
+
+Thanks again
+
+Best,
+Tom
+
+

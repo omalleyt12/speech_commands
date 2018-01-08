@@ -359,12 +359,12 @@ while offset < len(test_index):
     # test_prob_slow = sess.run(probabilities,feed_dict)
     # test_pred = (test_prob + test_prob_slow).argmax(axis=1)
 
-    test_files = [t["identifier"] for t in test_index[offset:(offset + test_batch_size)] ]
+    test_files = [t["identifier"] for t in test_index[offset:max(offset + test_batch_size,len(test_index))] ]
     # use this to ladder up on the silence and unknown labels
     for i in range(len(list(test_pred))):
         test_ladder_info.append({
             "guess":wanted_words[test_pred[i]],
-            "fname":test_files[offset+i]["identifier"],
+            "fname":test_files[i],
             "prob":test_prob[i].max()
         })
 
@@ -373,7 +373,6 @@ while offset < len(test_index):
     for i in range(len(test_labels)):
         if test_labels[i] not in wanted_words:
             test_labels[i] = "unknown"
-    test_files = [t["identifier"] for t in test_index[offset:(offset + test_batch_size)] ]
     test_batch_df = pd.DataFrame([{"fname":ti,"label":tl} for ti,tl in zip(test_files,test_labels)])
     offset += test_batch_size
     df = pd.concat([df,test_batch_df])
