@@ -49,7 +49,7 @@ def make_log_mel_fb(sig,name=None):
 def make_vtlp_mels(sig,is_training,name=None,bins=128):
     """A limitation with this approach is that the VTLP factor is the same within a batch, but individual VTLP did NOT help, so there's that"""
     with tf.name_scope(name,"audio_processing",[sig]) as scope:
-        vtlp = tf.cond(is_training,lambda: tf.truncated_normal([],1.0,0.1,dtype=tf.float64), lambda: 1.0)
+        vtlp = tf.cond(is_training,lambda: tf.truncated_normal([],1.0,0.1,dtype=tf.float64), lambda: tf.constant(1.0,tf.float64))
         stfts = tf.contrib.signal.stft(sig, frame_length=window_size_samples, frame_step=window_stride_samples,pad_end=True)
         magnitude_spectrograms = tf.abs(stfts)
         # Warp the linear-scale, magnitude spectrograms into the mel-scale.
