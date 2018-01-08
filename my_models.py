@@ -3,6 +3,21 @@ import tensorflow.contrib.slim as slim
 import custom_bn as bn
 from keras.layers import GlobalMaxPool2D
 
+
+def make_model(name,features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    if name == 'overdrive':
+        print("Overdrive")
+        return overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == 'newdrive':
+        print("New Drive")
+        return newdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == 'okconv':
+        print("OK Conv")
+        return okconv(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == 'dialconv':
+        print("Dial Conv")
+        return dilated_drive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 

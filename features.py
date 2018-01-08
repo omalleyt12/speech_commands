@@ -11,19 +11,15 @@ window_stride_samples = 10 * 16
 
 def make_features(wavs,is_training,name="log-mel"):
     if name == "log-mel":
-        print("Features: Log Mel")
         return make_vtlp_mels(wavs,is_training,bins=120)
     elif name == "multi-mels":
-        print("Using Multi Mels")
         return multi_mels(wavs,is_training,stride_ms=10)
     elif name == "mega-multi-mels":
-        print("Using Mega-Multi-Mels")
         return multi_mels(wavs,is_training,bins=256,stride_ms=5)
     elif name == "log-mel-40":
         return make_vtlp_mels(wavs,is_training,bins=40)
     elif name == "mfcc":
-        print("Features: MFCC")
-        return make_mfccs(wavs)
+        return make_vtlp_mfccs(wavs,is_training)
     else:
         print("Features: Identity")
         return wavs
@@ -48,6 +44,7 @@ def make_log_mel_fb(sig,name=None):
 
 def make_vtlp_mels(sig,is_training,name=None,bins=128):
     """A limitation with this approach is that the VTLP factor is the same within a batch, but individual VTLP did NOT help, so there's that"""
+    print("Using {} Log-Mels".format(bins))
     with tf.name_scope(name,"audio_processing",[sig]) as scope:
         vtlp = tf.cond(is_training,lambda: tf.truncated_normal([],1.0,0.1,dtype=tf.float64), lambda: tf.constant(1.0,tf.float64))
         stfts = tf.contrib.signal.stft(sig, frame_length=window_size_samples, frame_step=window_stride_samples,pad_end=True)
@@ -78,8 +75,11 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128):
         return log_mel_spectrograms
 
 def make_vtlp_mfccs(sig,is_training,name=None):
-    """This will be used to mirror Hello Edge architectures on MFCC"""
-    return None
+    """This will be used to mirror Hello Edge or Heng's architectures on MFCC"""
+    print("Using MFCCs")
+    log_mels = make_vtlp_mels(sig,is_training,bins=40)
+    mfccs = tf.contrib.signal.mfccs_from_log_mel_spectrograms(log_mels)[:40]
+    return mfccs
 
 def multi_mels(sig,is_training,name=None,bins=120,stride_ms=5):
     with tf.name_scope(name,"multi-mels",[sig]) as scope:

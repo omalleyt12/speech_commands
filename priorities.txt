@@ -1,0 +1,8 @@
+Ok, at this point my priorities HAVE to be:
+
+1) Incorporating Heng's strategy for unknowns and silence
+2) Creating models for MFCC and raw wave features
+	- I will have to spin up 3 servers so that I can run these in parallel
+	- I will have to adopt argparsing so that I don't have to keep changing things, and can keep GH up-to-date
+3) Ensembling these models together
+

@@ -1,3 +1,28 @@
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+   '--features',
+    type=str,
+    default='blah')
+parser.add_argument(
+    '--model',
+    type=str,
+    default='blah'
+)
+parser.add_argument(
+    '--save',
+    type=str,
+    default='blah'
+)
+parser.add_argument(
+    '--seed',
+    type=int,
+    default=0
+)
+FLAGS, unparsed = parser.parse_known_args()
+
+
 wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","off","stop","go"]
 all_words = wanted_words +["one","bed","bird","cat","dog","eight","five","four","happy","house","marvin","nine","seven","sheila","six","three","tree","two","wow","zero"]
 all_words_index = {w:i for i,w in enumerate(all_words)}
@@ -45,8 +70,8 @@ true_unknown_percentage = 10.0 # what percent of words should be complete gooble
 
 
 sess = tf.InteractiveSession()
-np.random.seed(0)
-tf.set_random_seed(0)
+np.random.seed(FLAGS.seed)
+tf.set_random_seed(FLAGS.seed)
 from keras import backend as K
 K.set_session(sess)
 
@@ -225,10 +250,6 @@ print("Length of training data {}".format(len(data_index["train"])))
 speakers = get_speakers(unknown_index,data_index)
 bg_data = wl.load_bg_data(sess)
 
-with tf.name_scope("decoded_sample_data") as scope:
-    rasbpi_ph0 = tf.placeholder_with_default(np.zeros((16000,1),np.float32),[16000,1],name=None)
-    rasbpi_ph1 = tf.placeholder_with_default(16000,[],name=None)
-
 
 labels_ph = tf.placeholder(tf.int32,(None))
 wav_ph = tf.placeholder(tf.float32,(None,sample_rate))
@@ -244,12 +265,11 @@ slow_down = tf.placeholder(tf.bool)
 
 processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph,slow_down)
 
-features = make_features(processed_wavs,is_training_ph,"log-mel")
-# scaled_features = tf.cond(scale_features,lambda: )
+features = make_features(processed_wavs,is_training_ph,FLAGS.features)
 
 output_neurons = len(all_words) if style == "full" else len(wanted_words)
 full_output_neurons = len(all_words)
-final_layer, full_final_layer, open_max_layer = overdrive_full_bn(features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
+final_layer, full_final_layer, open_max_layer = make_model(FLAGS.model,features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
 
 final_layer = tf.cond(use_full_layer,lambda: full_final_layer, lambda: final_layer)
 
@@ -277,8 +297,8 @@ saver = tf.train.Saver(tf.global_variables())
 tf.summary.scalar("cross_entropy",loss_mean)
 tf.summary.scalar("accuracy",accuracy_tensor)
 merged_summaries = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter("logs/train_unknown_overdrive_double_dropout",sess.graph)
-val_writer = tf.summary.FileWriter("logs/val_unknown_overdrive_double_dropout",sess.graph)
+train_writer = tf.summary.FileWriter("logs/train_{}".format(FLAGS.save),sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_{}".format(FLAGS.save),sess.graph)
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -326,7 +346,7 @@ for i in range(steps):
             learning_rate = 0.5*learning_rate
             print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
             # print("Restoring former model and rerunning validation")
-            # saver.restore(sess,"./model.ckpt")
+            # saver.restore(sess,"models/{}.ckpt".format(FLAGS.save))
             # val_acc = run_validation("val",i)
         # else:
         #     saver.save(sess,"./model.ckpt")
@@ -335,7 +355,7 @@ for i in range(steps):
 
     if learning_rate < 0.00001: # at this point, just stop
         break
-saver.save(sess,"./model.ckpt")
+saver.save(sess,"models/{}.ckpt".format(FLAGS.save))
 test_loss, test_acc = run_validation("test",i)
 MAVs, MR_MODELS = run_validation("train",i)
 
@@ -346,7 +366,6 @@ df = pd.DataFrame([],columns=["fname","label"])
 offset = 0
 test_batch_size = batch_size
 test_info = []
-test_ladder_info = []
 while offset < len(test_index):
     if offset % 1000 == 0: print(str(offset))
     # print(offset)
@@ -362,10 +381,11 @@ while offset < len(test_index):
     test_files = [t["identifier"] for t in test_index[offset:max(offset + test_batch_size,len(test_index))] ]
     # use this to ladder up on the silence and unknown labels
     for i in range(len(list(test_pred))):
-        test_ladder_info.append({
+        test_info.append({
             "guess":wanted_words[test_pred[i]],
             "fname":test_files[i],
-            "prob":test_prob[i].max()
+            "prob":test_prob[i].max(),
+            "all_prob":test_prob[i]
         })
 
 
@@ -379,8 +399,8 @@ while offset < len(test_index):
 
 df.to_csv("my_guesses_3.csv",index=False)
 sess.close()
-with open("test_ladder_info.pickle","wb") as f:
-    pickle.dump(test_ladder_info,f)
+with open("models/{}.pickle".format(FLAGS.save),"wb") as f:
+    pickle.dump(test_info,f)
 
 from twilio.rest import Client
 
