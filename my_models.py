@@ -210,9 +210,10 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neuron
     c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
 
     c = tf.contrib.layers.flatten(c)
+    c = tf.nn.dropout(c,keep_prob)
 
     fc = tf.contrib.slim.fully_connected(c,256)
-    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
+    # fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.9)
     fc = tf.nn.dropout(fc,keep_prob)
 
 
