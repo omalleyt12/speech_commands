@@ -359,11 +359,12 @@ while offset < len(test_index):
     # test_prob_slow = sess.run(probabilities,feed_dict)
     # test_pred = (test_prob + test_prob_slow).argmax(axis=1)
 
+    test_files = [t["identifier"] for t in test_index[offset:(offset + test_batch_size)] ]
     # use this to ladder up on the silence and unknown labels
     for i in range(len(list(test_pred))):
         test_ladder_info.append({
             "guess":wanted_words[test_pred[i]],
-            "data":feed_dict[wav_ph][i],
+            "fname":test_files[offset+i]["identifier"],
             "prob":test_prob[i].max()
         })
 
@@ -378,7 +379,6 @@ while offset < len(test_index):
     df = pd.concat([df,test_batch_df])
 
 df.to_csv("my_guesses_3.csv",index=False)
-pd.DataFrame(test_info).to_csv("test_mav_info.csv")
 sess.close()
 with open("test_ladder_info.pickle","wb") as f:
     pickle.dump(test_ladder_info,f)

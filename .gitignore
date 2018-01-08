@@ -1,3 +1,4 @@
+*.pb
 *errors_*
 *got_ems_*
 *.pickle
