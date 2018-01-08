@@ -251,7 +251,7 @@ def dilated_drive(features,keep_prob,num_final_neurons,num_full_final_neurons,is
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
     c = conv2d(c,512,[7,1],is_training,mp=[c.shape[1],1])
-    c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1])
+    c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
 
     c = tf.contrib.layers.flatten(c)
 
