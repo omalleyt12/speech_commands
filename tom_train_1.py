@@ -70,8 +70,10 @@ train_keep_prob = 0.5
 batch_size = 100
 eval_step = 500
 steps = 2000000
-no_val_steps = [1000,1000,1000,1000,3000,3000,5000,3000]
-no_val_lr = [0.01,0.005,0.0025,0.001,0.0005,0.0001,0.00005]
+no_val_steps = [1000,1000,1000,3000,3000,5000,3000,1]
+no_val_lr = [0.01,0.005,0.0025,0.001,0.0005,0.0001,0.00005,1e-8]
+# no_val_steps = [15,15,15]
+# no_val_lr = [0.01,0.001,1e-8]
 learning_rate = 0.01
 # decay_every = 2000
 decay_rate = 0.10
@@ -368,6 +370,7 @@ saver = tf.train.Saver()
 
 if FLAGS.train:
     last_val_loss = 9999999
+    should_stop = False
     for i in range(steps):
         if FLAGS.val:
             if i > 0 and i % 500 == 0:
@@ -375,8 +378,8 @@ if FLAGS.train:
         else:
             cum_no_val_step = 0
             for no_val_i,no_val_step in enumerate(no_val_steps):
-                cum_no_val_step += no_val_steps
-                if no_val_step > i:
+                cum_no_val_step += no_val_step
+                if cum_no_val_step > i:
                     learning_rate = no_val_lr[no_val_i]
                     break
 
@@ -471,11 +474,19 @@ account_sid = "AC7ef9b2470e5800d2cf47640564e18f3f"
 # Your Auth Token from twilio.com/console
 auth_token  = "e36bb44f5528a0bcbe45509b113d9469"
 
-client = Client(account_sid, auth_token)
-message = client.messages.create(
-    to="+19082682005",
-    from_="+12673607895",
-    body="Model finished running with {} val accuracy and {} val loss".format(val_acc,val_loss)) 
+if FLAGS.val:
+    client = Client(account_sid, auth_token)
+    message = client.messages.create(
+        to="+19082682005",
+        from_="+12673607895",
+        body="Model finished running with {} val accuracy and {} val loss".format(val_acc,val_loss)) 
+else:
+    client = Client(account_sid, auth_token)
+    message = client.messages.create(
+        to="+19082682005",
+        from_="+12673607895",
+        body="Model finished running")
+
 
 print(message.sid)
 
