@@ -199,7 +199,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                     silence_rec += pp.get_noise(bg_data,val=True) # since noise won't be added to any val data records
                 recs.append(silence_rec)
             else:
-                recs.append(pseudo_silence[np.random.randint(0,len(pseudo_silence))])
+                recs.append(pseudo_silence[np.random.randint(0,len(pseudo_silence)-1)])
 
             labels.append(all_words_index["silence"])
             bg_wavs.append(pp.get_noise(bg_data))
@@ -216,7 +216,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                     u_rec = unknown_index[mode][rand_unknown]["data"]
                     recs.append(u_rec)
                 else:
-                    recs.append(pseudo_unknown[np.random.randint(0,len(pseudo_unknown))])
+                    recs.append(pseudo_unknown[np.random.randint(0,len(pseudo_unknown)-1)])
                 labels.append(1)
                 bg_wavs.append(pp.get_noise(bg_data))
 

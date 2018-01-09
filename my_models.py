@@ -598,3 +598,20 @@ def full_resdilate(features,keep_prob,num_final_neurons,is_training):
     return final_layer, fc
 
 
+def capsnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """Can I implement a Capsule Network? Probably not"""
+    fingerprint_4d = tf.reshape(features,[-1,100,120,1])
+    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+
+    def conv_capslayer(caps_in,num_caps,vec_size):
+        """caps_in is a 5-d tensor, [batch,h,w,caps,vec_size]"""
+
+    # [batch,height,width,channels]
+    # [batch,height,width,channels,vecsize]
+    # [batch,height,width,channels,vecsize]
+    # [batch,height,width,channels,vecsize]
+    # [batch,total,vecsize]
+    # [batch,256,vecsize]
+    # [batch,12,vecsize]
+
+    return None
