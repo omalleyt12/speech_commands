@@ -25,6 +25,8 @@ parser.add_argument(
     type=str,
     default=None
 )
+parser.add_argument('--val',dest='val',action='store_true')
+parser.add_argument('--no-val',dest='val',action='store_false')
 parser.add_argument('--train',dest="train",action='store_true')
 parser.add_argument('--no-train',dest="train",action='store_false')
 
@@ -67,7 +69,9 @@ style = "unknown"
 train_keep_prob = 0.5
 batch_size = 100
 eval_step = 500
-steps = 2
+steps = 2000000
+no_val_steps = [1000,1000,1000,1000,3000,3000,5000,3000]
+no_val_lr = [0.01,0.005,0.0025,0.001,0.0005,0.0001,0.00005]
 learning_rate = 0.01
 # decay_every = 2000
 decay_rate = 0.10
@@ -98,7 +102,7 @@ def load_train_data(style="full"):
         word = os.path.split(os.path.dirname(wav_path))[-1].lower()
         if word == "_background_noise_":
             continue # don't include yet
-        set_name = utils.which_set(wav_path)
+        set_name = utils.which_set(wav_path) if FLAGS.val else "train"
         d = {"file":wav_path,"data":wav_loader.load(wav_path,sess)}
         if style == "full" or word in wanted_words:
             d.update({"label":word,"label_index":all_words_index[word]})
@@ -365,8 +369,17 @@ saver = tf.train.Saver()
 if FLAGS.train:
     last_val_loss = 9999999
     for i in range(steps):
-        if i > 0 and i % 500 == 0:
-            learning_rate = 0.9*learning_rate
+        if FLAGS.val:
+            if i > 0 and i % 500 == 0:
+                learning_rate = 0.9*learning_rate
+        else:
+            cum_no_val_step = 0
+            for no_val_i,no_val_step in enumerate(no_val_steps):
+                cum_no_val_step += no_val_steps
+                if no_val_step > i:
+                    learning_rate = no_val_lr[no_val_i]
+                    break
+
         feed_dict = get_batch(data_index["train"],batch_size,style=style)
         feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
         # now here's where we run the real, convnet part
@@ -382,24 +395,26 @@ if FLAGS.train:
         else:
             sess.run(train_step,feed_dict)
 
-        if i % eval_step == 0 or i == (steps - 1):
-            val_loss, val_acc = run_validation("val",i)
-            if val_loss > last_val_loss:
-                learning_rate = 0.5*learning_rate
-                print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
-                # print("Restoring former model and rerunning validation")
-                # saver.restore(sess,"models/{}.ckpt".format(FLAGS.save))
-                # val_acc = run_validation("val",i)
-            # else:
-            #     saver.save(sess,"./model.ckpt")
+        if FLAGS.val:
+            if i % eval_step == 0 or i == (steps - 1):
+                val_loss, val_acc = run_validation("val",i)
+                if val_loss > last_val_loss:
+                    learning_rate = 0.5*learning_rate
+                    print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
+                    # print("Restoring former model and rerunning validation")
+                    # saver.restore(sess,"models/{}.ckpt".format(FLAGS.save))
+                    # val_acc = run_validation("val",i)
+                # else:
+                #     saver.save(sess,"./model.ckpt")
 
-            last_val_loss = val_loss
+                last_val_loss = val_loss
 
         if learning_rate < 0.00001: # at this point, just stop
             break
     saver.save(sess,"models/{}.ckpt".format(FLAGS.save))
-    test_loss, test_acc = run_validation("test",i)
-    MAVs, MR_MODELS = run_validation("train",i)
+    if FLAGS.val:
+        test_loss, test_acc = run_validation("test",i)
+        MAVs, MR_MODELS = run_validation("train",i)
     del data_index # need to conserve RAM
 
 if not FLAGS.train:

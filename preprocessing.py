@@ -129,7 +129,7 @@ def tf_pad(wav):
     amount_cut = tf.cast(16000 - word_frame_size,tf.int64)
     start_index, _ = tf_get_word(wav,word_frame_size,True)
     wrap_start = tf.random_uniform([],start_index - amount_cut, start_index,dtype=tf.int64)
-    return tf.concat([wav[wrap_start:],wav[:wrap_start]],axis=0)
+    return tf.concat([wav[wrap_start:tf.constant(-1,tf.int64)],wav[tf.constant(0,tf.int64):wrap_start]],axis=0)
 
 def tf_simple_pad(wav):
     pad = tf.random_uniform([],-100,100,dtype=tf.int32)

@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from toolz.functoolz import memoize
-from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
+# from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
 import mel_matrix
 
 sample_rate = 16000
@@ -120,21 +120,21 @@ def multi_mels(sig,is_training,name=None,bins=120,stride_ms=5):
         stacked_log_mels = tf.stack(mels_list,axis=3)
         return stacked_log_mels
 
-def make_mfccs(sig):
-    def make_1_mfcc(s):
-        spectrogram = contrib_audio.audio_spectrogram(
-            tf.reshape(s,(s.shape[0],1)),
-            window_size = window_size_samples,
-            stride = window_stride_samples,
-            magnitude_squared = True
-        )
-        mfcc = contrib_audio.mfcc(
-            spectrogram,
-            sample_rate,
-            dct_coefficient_count = 40
-        )
-        mfcc_2d = tf.reshape(mfcc,[mfcc.shape[1],mfcc.shape[2]])
-        return mfcc_2d
+# def make_mfccs(sig):
+#     def make_1_mfcc(s):
+#         spectrogram = contrib_audio.audio_spectrogram(
+#             tf.reshape(s,(s.shape[0],1)),
+#             window_size = window_size_samples,
+#             stride = window_stride_samples,
+#             magnitude_squared = True
+#         )
+#         mfcc = contrib_audio.mfcc(
+#             spectrogram,
+#             sample_rate,
+#             dct_coefficient_count = 40
+#         )
+#         mfcc_2d = tf.reshape(mfcc,[mfcc.shape[1],mfcc.shape[2]])
+#         return mfcc_2d
 
-    return tf.map_fn(make_1_mfcc,sig,parallel_iterations=100,back_prop=False,dtype=tf.float32)
+#     return tf.map_fn(make_1_mfcc,sig,parallel_iterations=100,back_prop=False,dtype=tf.float32)
 
