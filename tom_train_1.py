@@ -462,7 +462,7 @@ while offset < len(test_index):
     offset += test_batch_size
     df = pd.concat([df,test_batch_df])
 
-df.to_csv("my_guesses_3.csv",index=False)
+df.to_csv("models/{}_guesses.csv".format(FLAGS.save),index=False)
 sess.close()
 with open("models/{}_comp.pickle".format(FLAGS.save),"wb") as f:
     pickle.dump(test_info,f)
