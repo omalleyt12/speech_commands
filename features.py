@@ -20,6 +20,8 @@ def make_features(wavs,is_training,name="log-mel"):
         return make_vtlp_mels(wavs,is_training,bins=40)
     elif name == "mfcc":
         return make_vtlp_mfccs(wavs,is_training)
+    elif name == "mel":
+        return make_vtlp_mels(wavs,is_training,bins=120,log=False)
     else:
         print("Features: Identity")
         return wavs
@@ -42,7 +44,7 @@ def make_log_mel_fb(sig,name=None):
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
         return log_mel_spectrograms
 
-def make_vtlp_mels(sig,is_training,name=None,bins=128):
+def make_vtlp_mels(sig,is_training,name=None,bins=128,log=True,frame_equalize=False):
     """A limitation with this approach is that the VTLP factor is the same within a batch, but individual VTLP did NOT help, so there's that"""
     print("Using {} Log-Mels".format(bins))
     with tf.name_scope(name,"audio_processing",[sig]) as scope:
@@ -59,6 +61,14 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128):
         mel_spectrograms = tf.tensordot(magnitude_spectrograms, linear_to_mel_weight_matrix, 1)
         # Note: Shape inference for `tf.tensordot` does not currently handle this case.
         mel_spectrograms.set_shape(magnitude_spectrograms.shape[:-1].concatenate(linear_to_mel_weight_matrix.shape[-1:]))
+
+        if frame_equalize:
+            # every frame will have the same volume, might help for learning features if volumes don't matter too much
+            mel_spectrograms = mel_spectrograms*200.0/(tf.reduce_sum(mel_spectrograms,axis=2,keep_dims=True) + 1e-6)
+
+        if not log:
+            return mel_spectrograms
+
         log_offset = 1e-6
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
 

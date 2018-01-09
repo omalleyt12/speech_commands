@@ -20,6 +20,14 @@ parser.add_argument(
     type=int,
     default=0
 )
+parser.add_argument(
+    '--pseudo_labels',
+    type=str,
+    default=None
+)
+parser.add_argument('--train',dest="train",action='store_true')
+parser.add_argument('--no-train',dest="train",action='store_false')
+
 FLAGS, unparsed = parser.parse_known_args()
 
 
@@ -108,6 +116,23 @@ def load_train_data(style="full"):
 
     return data_index, unknown_index
 
+def load_pseudo_labels():
+    print("Loading Pseudo Labels")
+    wav_loader = wl.WavLoader("pseudo_silence_loader",desired_samples=sample_rate)
+    with open("models/{}_comp.pickle".format(FLAGS.pseudo_labels),"rb") as f:
+        pseudo_labels = pickle.load(f)
+
+    pseudo_silence = []
+    pseudo_unknown = []
+    for ele in pseudo_labels:
+        if ele["guess"] == "silence":
+            pseudo_silence.append(wav_loader.load("test/audio/{}".format(ele["fname"]),sess))
+        elif ele["guess"] == "unknown":
+            pseudo_unknown.append(wav_loader.load("test/audio/{}".format(ele["fname"]),sess))
+    return pseudo_silence, pseudo_unknown
+
+
+
 def get_speakers(unknown_index,data_index):
     """Organize unknowns into speakers who have spoken two or more different words"""
     def unique_words(l):
@@ -161,22 +186,31 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
     if mode != "comp": # add silence and unknowns to batches randomly
         silence_recs = int(batch_size * silence_percentage / 100)
         for j in range(silence_recs):
-            silence_rec = np.zeros(sample_rate,dtype=np.float32) 
-            if mode == "val":
-                silence_rec += pp.get_noise(bg_data,val=True) # since noise won't be added to any val data records
-            recs.append(silence_rec)
+            pseudo_picker = 0 if mode == "val" or FLAGS.pseudo_labels is None else np.random.uniform(0,1)
+            if pseudo_picker < 0.5:
+                silence_rec = np.zeros(sample_rate,dtype=np.float32) 
+                if mode == "val":
+                    silence_rec += pp.get_noise(bg_data,val=True) # since noise won't be added to any val data records
+                recs.append(silence_rec)
+            else:
+                recs.append(pseudo_silence[np.random.randint(0,len(pseudo_silence))])
+
             labels.append(all_words_index["silence"])
             bg_wavs.append(pp.get_noise(bg_data))
 
         if style != "full":
             unknown_recs = int(batch_size * unknown_percentage / 100)
             for j in range(unknown_recs):
-                # if mode == "val": # Try and make val more deterministic
-                #     rand_unknown = offset + j
-                # else:
-                rand_unknown = np.random.randint(0,len(unknown_index[mode]))
-                u_rec = unknown_index[mode][rand_unknown]["data"]
-                recs.append(u_rec)
+                pseudo_picker = 0 if mode == "val" or FLAGS.pseudo_labels is None else np.random.uniform(0,1)
+                if pseudo_picker < 0.5:
+                    # if mode == "val": # Try and make val more deterministic
+                    #     rand_unknown = offset + j
+                    # else:
+                    rand_unknown = np.random.randint(0,len(unknown_index[mode]))
+                    u_rec = unknown_index[mode][rand_unknown]["data"]
+                    recs.append(u_rec)
+                else:
+                    recs.append(pseudo_unknown[np.random.randint(0,len(pseudo_unknown))])
                 labels.append(1)
                 bg_wavs.append(pp.get_noise(bg_data))
 
@@ -242,13 +276,16 @@ def run_validation(set_name,step):
 
     return val_loss.calculate(), val_acc.calculate()
 
-
-data_index, unknown_index = load_train_data(style=style)
-print("Length of unknown_index for train {}".format(len(unknown_index["train"])))
-print("Length of training data {}".format(len(data_index["train"])))
-# full_data_index, _ = load_train_data("full")
-speakers = get_speakers(unknown_index,data_index)
+if FLAGS.train:
+    data_index, unknown_index = load_train_data(style=style)
+    print("Length of unknown_index for train {}".format(len(unknown_index["train"])))
+    print("Length of training data {}".format(len(data_index["train"])))
+    # full_data_index, _ = load_train_data("full")
+    # speakers = get_speakers(unknown_index,data_index)
 bg_data = wl.load_bg_data(sess)
+
+if FLAGS.pseudo_labels is not None:
+    pseudo_silence, pseduo_unknown = load_pseudo_labels()
 
 
 labels_ph = tf.placeholder(tf.int32,(None))
@@ -311,53 +348,62 @@ sess.run(tf.global_variables_initializer())
 #     feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
 #     scale_input.append(sess.run(features,feed_dict))
 #     if i%10 == 0: print(str(i))
-# scale_input = np.stack(scale_input,axis=0)
-# scale_means = scale_input.mean() # just average over everything for now
-# scale_stds = scale_input.std()
+# scale_input = np.concatenate(scale_input,axis=0)
+# scale_means = scale_input.sum(axis=2).mean() # just average over everything for now
+# scale_stds = scale_input.sum(axis=2).std()
+# scale_max = scale_input.sum(axis=2).max()
 # print("Mean")
 # print(scale_means)
 # print("Std")
 # print(scale_stds)
+# print("Max")
+# print(scale_max)
 
 
 saver = tf.train.Saver()
-last_val_loss = 9999999
-for i in range(steps):
-    if i > 0 and i % 500 == 0:
-        learning_rate = 0.9*learning_rate
-    feed_dict = get_batch(data_index["train"],batch_size,style=style)
-    feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
-    # now here's where we run the real, convnet part
-    if i % 10 == 0:
-        _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
-        train_writer.add_summary(sum_val,i)
-        tf.logging.info("Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
 
-        # full_feed_dict = get_batch(full_data_index["train"],batch_size,style="full")
-        # full_feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph:True,use_full_layer:True})
-        # _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],full_feed_dict)
-        # tf.logging.info("Full Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
-    else:
-        sess.run(train_step,feed_dict)
+if FLAGS.train:
+    last_val_loss = 9999999
+    for i in range(steps):
+        if i > 0 and i % 500 == 0:
+            learning_rate = 0.9*learning_rate
+        feed_dict = get_batch(data_index["train"],batch_size,style=style)
+        feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
+        # now here's where we run the real, convnet part
+        if i % 10 == 0:
+            _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
+            train_writer.add_summary(sum_val,i)
+            tf.logging.info("Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
 
-    if i % eval_step == 0 or i == (steps - 1):
-        val_loss, val_acc = run_validation("val",i)
-        if val_loss > last_val_loss:
-            learning_rate = 0.5*learning_rate
-            print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
-            # print("Restoring former model and rerunning validation")
-            # saver.restore(sess,"models/{}.ckpt".format(FLAGS.save))
-            # val_acc = run_validation("val",i)
-        # else:
-        #     saver.save(sess,"./model.ckpt")
+            # full_feed_dict = get_batch(full_data_index["train"],batch_size,style="full")
+            # full_feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph:True,use_full_layer:True})
+            # _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],full_feed_dict)
+            # tf.logging.info("Full Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
+        else:
+            sess.run(train_step,feed_dict)
 
-        last_val_loss = val_loss
+        if i % eval_step == 0 or i == (steps - 1):
+            val_loss, val_acc = run_validation("val",i)
+            if val_loss > last_val_loss:
+                learning_rate = 0.5*learning_rate
+                print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
+                # print("Restoring former model and rerunning validation")
+                # saver.restore(sess,"models/{}.ckpt".format(FLAGS.save))
+                # val_acc = run_validation("val",i)
+            # else:
+            #     saver.save(sess,"./model.ckpt")
 
-    if learning_rate < 0.00001: # at this point, just stop
-        break
-saver.save(sess,"models/{}.ckpt".format(FLAGS.save))
-test_loss, test_acc = run_validation("test",i)
-MAVs, MR_MODELS = run_validation("train",i)
+            last_val_loss = val_loss
+
+        if learning_rate < 0.00001: # at this point, just stop
+            break
+    saver.save(sess,"models/{}.ckpt".format(FLAGS.save))
+    test_loss, test_acc = run_validation("test",i)
+    MAVs, MR_MODELS = run_validation("train",i)
+    del data_index # need to conserve RAM
+
+if not FLAGS.train:
+    saver.restore(sess,"models/{}.ckpt".format(FLAGS.save))
 
 test_index = wl.load_test_data(sess)
 # now here's where we run the test classification
@@ -371,7 +417,7 @@ while offset < len(test_index):
     # print(offset)
     feed_dict = get_batch(test_index,test_batch_size,offset=offset,mode="comp",style=style)
     feed_dict.update({ keep_prob:1.0,is_training_ph:False})
-    test_av, test_prob, test_pred = sess.run([open_max_layer,probabilities,predictions],feed_dict=feed_dict)
+    test_logits,test_av, test_prob, test_pred = sess.run([final_layer,open_max_layer,probabilities,predictions],feed_dict=feed_dict)
 
     # use this to average over the regular speed and slowed down predictions
     # feed_dict.update({keep_prob:1.0,is_training_ph:False,slow_down:True})
@@ -385,7 +431,8 @@ while offset < len(test_index):
             "guess":wanted_words[test_pred[i]],
             "fname":test_files[i],
             "prob":test_prob[i].max(),
-            "all_prob":test_prob[i]
+            "all_prob":test_prob[i],
+            "logits":test_logits[i]
         })
 
 
@@ -399,7 +446,7 @@ while offset < len(test_index):
 
 df.to_csv("my_guesses_3.csv",index=False)
 sess.close()
-with open("models/{}.pickle".format(FLAGS.save),"wb") as f:
+with open("models/{}_comp.pickle".format(FLAGS.save),"wb") as f:
     pickle.dump(test_info,f)
 
 from twilio.rest import Client
