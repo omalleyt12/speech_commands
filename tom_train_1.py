@@ -67,7 +67,7 @@ style = "unknown"
 train_keep_prob = 0.5
 batch_size = 100
 eval_step = 500
-steps = 200000
+steps = 2
 learning_rate = 0.01
 # decay_every = 2000
 decay_rate = 0.10
@@ -285,7 +285,7 @@ if FLAGS.train:
 bg_data = wl.load_bg_data(sess)
 
 if FLAGS.pseudo_labels is not None:
-    pseudo_silence, pseduo_unknown = load_pseudo_labels()
+    pseudo_silence, pseudo_unknown = load_pseudo_labels()
 
 
 labels_ph = tf.placeholder(tf.int32,(None))

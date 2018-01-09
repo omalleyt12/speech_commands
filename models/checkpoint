@@ -1,2 +1,2 @@
-model_checkpoint_path: "dialconv.ckpt"
-all_model_checkpoint_paths: "dialconv.ckpt"
+model_checkpoint_path: "overdrive.ckpt"
+all_model_checkpoint_paths: "overdrive.ckpt"
