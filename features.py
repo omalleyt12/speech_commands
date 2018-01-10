@@ -22,6 +22,8 @@ def make_features(wavs,is_training,name="log-mel"):
         return make_vtlp_mels(wavs,is_training,bins=40)
     elif name == "mfcc":
         return make_vtlp_mfccs(wavs,is_training)
+    elif name == "mfcc-13":
+        return make_vtlp_mfccs(wavs,is_training,num_mfccs=13)
     elif name == "mel":
         return make_vtlp_mels(wavs,is_training,bins=120,log=False)
     else:
@@ -87,11 +89,11 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128,log=True,frame_equalize=Fa
         #     return tf.concat([frame_energies,log_mel_spectrograms],axis=2)
         return log_mel_spectrograms
 
-def make_vtlp_mfccs(sig,is_training,name=None):
+def make_vtlp_mfccs(sig,is_training,name=None,num_mfccs=13):
     """This will be used to mirror Hello Edge or Heng's architectures on MFCC"""
     print("Using MFCCs")
     log_mels = make_vtlp_mels(sig,is_training,bins=40)
-    mfccs = tf.contrib.signal.mfccs_from_log_mel_spectrograms(log_mels)[:40]
+    mfccs = tf.contrib.signal.mfccs_from_log_mel_spectrograms(log_mels)[:num_mfccs]
     return mfccs
 
 def multi_mels(sig,is_training,name=None,bins=120,stride_ms=5):

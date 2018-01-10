@@ -17,6 +17,9 @@ def make_model(name,features,keep_prob,num_final_neurons,num_full_final_neurons,
     elif name == 'dialconv':
         print("Dial Conv")
         return dilated_drive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == "mfccnet":
+        prtin("MFCCNet")
+        return mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
 
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
@@ -615,3 +618,28 @@ def capsnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_train
     # [batch,12,vecsize]
 
     return None
+
+def mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """Running a model based on 13 MFCCs"""
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+    c = conv2d(fingerprint_4d,64,[7,1],is_training)
+    c = conv2d(c,32,[1,1],is_training)
+    c = conv2d(c,256,[1,13],is_training,padding="VALID")
+    c = conv2d(c,128,[1,1],is_training)
+    c = conv2d(c,256,[7,1],is_training)
+
+    c = tf.nn.max_pool(c,[1,c.shape[0],c.shape[1],1],[1,c.shape[0],c.shape[1],1])
+
+    c = tf.contrib.layers.flatten(c)
+
+    fc = tf.contrib.layers.fully_connected(c,256,activation_fn=None)
+    fc = slim.batch_norm(fc,is_training=is_training,decay=0.95)
+    fc = tf.nn.relu(fc)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+
+    return final_layer, full_final_layer, fc
