@@ -1,0 +1,5 @@
+python tom_train_1.py --features log-mel --model overdrive --save overdrive --train --no-val
+python tom_train_1.py --features log-mel --model overdrive --save overdrive_pl1 --pseudo_labels overdrive --train --no-val
+python tom_train_1.py --features log-mel --model overdrive --save overdrive_pl2 --pseudo_labels overdrive_pl1 --train --no-val
+python tom_train_1.py --features equal-log-mel --model overdrive --save overdrive_frame_eq --train --no-val --pseudo_labels overdrive
+

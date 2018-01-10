@@ -29,6 +29,9 @@ parser.add_argument(
     '--pseudo-tom',dest="pseudo_tom",action="store_true",default=False
 )
 parser.add_argument(
+    '--restore',type=str,default=None
+)
+parser.add_argument(
     '--no-noise',dest="noise",action="store_false",default=True
 )
 parser.add_argument('--val',dest='val',action='store_true')
@@ -136,12 +139,21 @@ def load_pseudo_labels():
 
     pseudo_silence = []
     pseudo_unknown = []
+    pseduo_wanted = []
     for ele in pseudo_labels:
+        d = {
+            "data":wav_loader.load("test/audio/{}".format(ele["fname"]),sess),
+            "guess":ele["all_prob"].argmax(),
+            "prob":ele["all_prob"]
+        }
+
         if ele["guess"] == "silence":
-            pseudo_silence.append(wav_loader.load("test/audio/{}".format(ele["fname"]),sess))
+            pseudo_silence.append(d)
         elif ele["guess"] == "unknown":
-            pseudo_unknown.append(wav_loader.load("test/audio/{}".format(ele["fname"]),sess))
-    return pseudo_silence, pseudo_unknown
+            pseudo_unknown.append(d)
+        else:
+            pseudo_wanted.append(d)
+    return pseudo_silence, pseudo_unknown, pseudo_wanted
 
 
 
@@ -179,20 +191,36 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
     """Does preprocessing of WAVs and returns the feed_dict for a batch"""
     recs = []
     labels = []
+    label_weights = []
+    sources = []
+    samp_nums = []
     bg_wavs = []
     if offset + batch_size > len(data_index):
         batch_size = len(data_index) - offset
 
     for j in range(batch_size):
-        samp_index = np.random.randint(len(data_index)) if mode == "train" else offset
-        offset += 1 # only matters if mode != "train"
+        pseudo_picker = 0 if mode == "val" or mode == "comp" or not FLAGS.pseudo_tom else np.random.uniform(0,1)
+        if pseudo_picker < 0.5:
+            samp_index = np.random.randint(len(data_index)) if mode == "train" else offset
+            offset += 1 # only matters if mode != "train"
 
-        rec = data_index[samp_index]
-        rec_data = rec["data"]
+            rec = data_index[samp_index]
+            rec_data = rec["data"]
+            if mode != "comp":
+                labels.append(rec["label_index"])
+                label_weights.append(1.0)
+                sources.append(0)
+                samp_nums.append(0)
+            recs.append(rec_data)
+        else:
+            pseudo_int = np.random.randint(0,len(pseudo_wanted)-1)
+            rec = pseudo_wanted[pseudo_int]
+            rec.append(rec["data"])
+            labels.append(rec["guess"])
+            label_weights.append(rec["prob"].max())
+            sources.append(1)
+            samp_nums.append(pseudo_int)
 
-        if mode != "comp":
-            labels.append(rec["label_index"])
-        recs.append(rec_data)
         bg_wavs.append(pp.get_noise(bg_data,noise=FLAGS.noise)) # won't add noise to regular examples if flag is set
 
     if mode != "comp": # add silence and unknowns to batches randomly
@@ -204,10 +232,20 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                 if mode == "val":
                     silence_rec += pp.get_noise(bg_data,val=True) # since noise won't be added to any val data records
                 recs.append(silence_rec)
+                labels.append(all_words_index["silence"])
+                label_weights.append(1.0)
+                sources.append(0)
+                samp_nums.append(0)
             else:
-                recs.append(pseudo_silence[np.random.randint(0,len(pseudo_silence)-1)])
+                # this might stop predicting it as silence, which would be weird but ok
+                pseudo_int = np.random.randint(0,len(pseudo_silence)-1)
+                rec = pseudo_silence[pseudo_int]
+                rec.append(rec["data"])
+                labels.append(rec["guess"])
+                label_weights.append(rec["prob"].max())
+                sources.append(2)
+                samp_nums.append(pseudo_int)
 
-            labels.append(all_words_index["silence"])
             bg_wavs.append(pp.get_noise(bg_data))
 
         if style != "full":
@@ -221,14 +259,28 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                     rand_unknown = np.random.randint(0,len(unknown_index[mode]))
                     u_rec = unknown_index[mode][rand_unknown]["data"]
                     recs.append(u_rec)
+                    label_weights.append(1.0)
+                    labels.append(1)
+                    sources.append(0)
+                    samp_nums.append(0)
                 else:
-                    recs.append(pseudo_unknown[np.random.randint(0,len(pseudo_unknown)-1)])
-                labels.append(1)
+                    # this might stop predicting it as unknown, which would be weird but ok
+                    pseudo_int = np.random.randint(0,len(pseudo_unknown)-1)
+                    rec = pseudo_unknown[pseudo_int]
+                    rec.append(rec["data"])
+                    labels.append(rec["guess"])
+                    label_weights.append(rec["prob"].max())
+                    sources.append(3)
+                    samp_nums.append(pseudo_int)
+
                 bg_wavs.append(pp.get_noise(bg_data,noise=FLAGS.noise)) # won't add noise to unknowns is flag is set
 
     feed_dict={ wav_ph: np.stack(recs), bg_wavs_ph: np.stack(bg_wavs), use_full_layer: False, slow_down: False}
     if mode != "comp":
         feed_dict[labels_ph] = np.stack(labels).astype(np.int32)
+        feed_dict[label_weights_ph] = np.stack(label_weights).astype(np.float32)
+        feed_dict[sources_ph] = np.stack(sources).astype(np.int32)
+        feed_dict[samp_nums_ph] = np.stack(samp_nums).astype(np.int32)
     return feed_dict
 
 def run_validation(set_name,step):
@@ -297,12 +349,15 @@ if FLAGS.train:
 bg_data = wl.load_bg_data(sess)
 
 if FLAGS.pseudo_labels is not None:
-    pseudo_silence, pseudo_unknown = load_pseudo_labels()
+    pseudo_silence, pseudo_unknown, pseudo_wanted = load_pseudo_labels()
 
 
 labels_ph = tf.placeholder(tf.int32,(None))
 wav_ph = tf.placeholder(tf.float32,(None,sample_rate))
 bg_wavs_ph = tf.placeholder(tf.float32,[None,sample_rate])
+label_weights_ph = tf.placeholder(tf.float32,(None))
+sources_ph = tf.placeholder(tf.int32,(None))
+samp_nums_ph = tf.placeholder(tf.int32,(None))
 
 keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
@@ -324,10 +379,8 @@ final_layer = tf.cond(use_full_layer,lambda: full_final_layer, lambda: final_lay
 
 probabilities = tf.nn.softmax(final_layer)
 
-loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
-full_loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph,logits=full_final_layer)
-
-# total_loss = tf.losses.get_total_loss()
+loss = tf.pow(label_weights_ph,2)*tf.nn.softmax_cross_entropy_with_logits(labels=labels_ph,logits=final_layer)
+loss_mean = tf.reduce_mean(loss)
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 optimizer = tf.train.AdamOptimizer(learning_rate_ph)
@@ -392,17 +445,26 @@ if FLAGS.train:
         feed_dict = get_batch(data_index["train"],batch_size,style=style)
         feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
         # now here's where we run the real, convnet part
+        _,sum_val,acc_val,loss_val,_,train_prob,train_sources,train_samp_nums = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step,probabilities,sources_ph,samp_nums_ph])
+        # this will update the probabilities and guessed label for the data that originated with the test set
+        for batch_index, source_type in enumerate(train_sources):
+            if source_type == 0:
+                continue
+            if source_type == 1:
+                l = pseudo_wanted
+            elif source_type == 2:
+                l = pseudo_silence
+            elif source_type == 3:
+                l = pseudo_unknown
+
+            d = l[train_samp_nums[batch_index]]
+            d["prob"] = (d["prob"] + train_prob[batch_index])/2
+            d["guess"] = d["prob"].argmax()
+            l[train_samp_nums[batch_index]] = d
+
         if i % 10 == 0:
-            _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
             train_writer.add_summary(sum_val,i)
             tf.logging.info("Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
-
-            # full_feed_dict = get_batch(full_data_index["train"],batch_size,style="full")
-            # full_feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph:True,use_full_layer:True})
-            # _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],full_feed_dict)
-            # tf.logging.info("Full Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
-        else:
-            sess.run([update_ops,train_step],feed_dict)
 
         if FLAGS.val:
             if i % eval_step == 0 or i == (steps - 1):
