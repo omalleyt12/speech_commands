@@ -79,8 +79,8 @@ train_keep_prob = 0.5
 batch_size = 100
 eval_step = 500
 steps = 2000000
-no_val_steps = [1000,1000,1000,3000,3000,5000,3000,1]
-no_val_lr = [0.01,0.005,0.0025,0.001,0.0005,0.0001,0.00005,1e-8]
+no_val_steps = [5000,5000,3000,10]
+no_val_lr = [0.001,0.0001,0.00005,1e-8]
 # no_val_steps = [15,15,15]
 # no_val_lr = [0.01,0.001,1e-8]
 learning_rate = 0.01
@@ -426,6 +426,9 @@ sess.run(tf.global_variables_initializer())
 
 
 saver = tf.train.Saver()
+if FLAGS.restore is not None:
+    print("Restoring {}".format(FLAGS.restore))
+    saver.restore(sess,"models/{}.ckpt".format(FLAGS.restore))
 
 if FLAGS.train:
     last_val_loss = 9999999

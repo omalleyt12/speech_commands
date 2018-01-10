@@ -25,7 +25,7 @@ for fname, prob_list in clips.items():
         "label":wanted_words[guess]
     })
 
-pd.DataFrame(pred_list).to_csv("ensemble_prediction.csv")
+pd.DataFrame(pred_list).to_csv("ensemble_prediction.csv",index=False)
 
 
 
