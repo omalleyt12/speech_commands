@@ -12,6 +12,8 @@ window_stride_samples = 10 * 16
 def make_features(wavs,is_training,name="log-mel"):
     if name == "log-mel":
         return make_vtlp_mels(wavs,is_training,bins=120)
+    elif name == "equal-log-mel":
+        return make_vtlp_mels(wavs,is_training,bins=120,frame_equalize=True)
     elif name == "multi-mels":
         return multi_mels(wavs,is_training,stride_ms=10)
     elif name == "mega-multi-mels":
@@ -63,6 +65,7 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128,log=True,frame_equalize=Fa
         mel_spectrograms.set_shape(magnitude_spectrograms.shape[:-1].concatenate(linear_to_mel_weight_matrix.shape[-1:]))
 
         if frame_equalize:
+            print("Frame equalizing")
             # every frame will have the same volume, might help for learning features if volumes don't matter too much
             mel_spectrograms = mel_spectrograms*200.0/(tf.reduce_sum(mel_spectrograms,axis=2,keep_dims=True) + 1e-6)
 

@@ -25,6 +25,9 @@ parser.add_argument(
     type=str,
     default=None
 )
+parser.add_argument(
+    '--no-noise',dest="noise",action="store_false",default=True
+)
 parser.add_argument('--val',dest='val',action='store_true')
 parser.add_argument('--no-val',dest='val',action='store_false')
 parser.add_argument('--train',dest="train",action='store_true')
@@ -187,7 +190,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         if mode != "comp":
             labels.append(rec["label_index"])
         recs.append(rec_data)
-        bg_wavs.append(pp.get_noise(bg_data))
+        bg_wavs.append(pp.get_noise(bg_data,noise=FLAGS.noise)) # won't add noise to regular examples if flag is set
 
     if mode != "comp": # add silence and unknowns to batches randomly
         silence_recs = int(batch_size * silence_percentage / 100)
@@ -218,7 +221,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                 else:
                     recs.append(pseudo_unknown[np.random.randint(0,len(pseudo_unknown)-1)])
                 labels.append(1)
-                bg_wavs.append(pp.get_noise(bg_data))
+                bg_wavs.append(pp.get_noise(bg_data,noise=FLAGS.noise)) # won't add noise to unknowns is flag is set
 
     feed_dict={ wav_ph: np.stack(recs), bg_wavs_ph: np.stack(bg_wavs), use_full_layer: False, slow_down: False}
     if mode != "comp":

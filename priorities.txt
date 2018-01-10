@@ -1,3 +1,20 @@
+I have this idea about how to bootstrap using learning on the test data:
+
+So, first train on the training data only
+
+Then, train on the test data + training data as follows:
+
+1) Loss = (prob of test_label - 0.50)*2*softmax_loss(test_pred,test_label)
+2) Update the (prob of test_label) based on new softmax calculation
+
+Repeat for many iterations, and this should, over time, correct the incorrect labels on the test data and gradually move to a solution that
+generalizes well on the test data
+
+In this way, you get a lot more exposure to data, you get a lot more data augmentation, and the labels that you're not sure about are not used that much
+in the loss...until you become more sure about them
+
+
+
 Ok, at this point my priorities HAVE to be:
 
 1) Incorporating Heng's strategy for unknowns and silence
@@ -6,7 +23,10 @@ Ok, at this point my priorities HAVE to be:
 	- I will have to adopt argparsing so that I don't have to keep changing things, and can keep GH up-to-date
 3) Ensembling these models together
 	- Different models to try:
-		1) 5 Overdrive models with different seeds, since this is my best model
+		1) Models with no noise
+		1) Models using mixup data augmentation
+		1) Models that train on pseudo labels for silence and unknowns
+		1) 5 Overdrive Pseudo-Label models with different seeds, since this is my best model
 		2) Ok Conv
 		3) An RNN version of Overdrive
 		4) An average-pooled (at all levels) version of Overdrive
