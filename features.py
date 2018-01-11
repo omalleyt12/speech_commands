@@ -12,6 +12,8 @@ window_stride_samples = 10 * 16
 def make_features(wavs,is_training,name="log-mel"):
     if name == "log-mel":
         return make_vtlp_mels(wavs,is_training,bins=120)
+    elif name == "short-log-mel":
+        return make_vtlp_mels(wavs,is_training,bins=120,window_ms=16,stride_ms=8)
     elif name == "equal-log-mel":
         return make_vtlp_mels(wavs,is_training,bins=120,frame_equalize=True)
     elif name == "multi-mels":
@@ -24,6 +26,8 @@ def make_features(wavs,is_training,name="log-mel"):
         return make_vtlp_mfccs(wavs,is_training)
     elif name == "mfcc-13":
         return make_vtlp_mfccs(wavs,is_training,num_mfccs=13)
+    elif name == "short-mfcc-13":
+        return make_vtlp_mfccs(wavs,is_training,num_mfccs=13,window_ms=16,stride_ms=8)
     elif name == "mel":
         return make_vtlp_mels(wavs,is_training,bins=120,log=False)
     else:
@@ -48,9 +52,11 @@ def make_log_mel_fb(sig,name=None):
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
         return log_mel_spectrograms
 
-def make_vtlp_mels(sig,is_training,name=None,bins=128,log=True,frame_equalize=False):
+def make_vtlp_mels(sig,is_training,name=None,bins=128,log=True,frame_equalize=False,window_ms=30,stride_ms=10):
     """A limitation with this approach is that the VTLP factor is the same within a batch, but individual VTLP did NOT help, so there's that"""
     print("Using {} Log-Mels".format(bins))
+    window_size_samples = window_ms * 16
+    window_stride_samples = stride_ms * 16
     with tf.name_scope(name,"audio_processing",[sig]) as scope:
         vtlp = tf.cond(is_training,lambda: tf.truncated_normal([],1.0,0.1,dtype=tf.float64), lambda: tf.constant(1.0,tf.float64))
         stfts = tf.contrib.signal.stft(sig, frame_length=window_size_samples, frame_step=window_stride_samples,pad_end=True)
@@ -89,10 +95,10 @@ def make_vtlp_mels(sig,is_training,name=None,bins=128,log=True,frame_equalize=Fa
         #     return tf.concat([frame_energies,log_mel_spectrograms],axis=2)
         return log_mel_spectrograms
 
-def make_vtlp_mfccs(sig,is_training,name=None,num_mfccs=13):
+def make_vtlp_mfccs(sig,is_training,name=None,num_mfccs=13,window_ms=30,stride_ms=10):
     """This will be used to mirror Hello Edge or Heng's architectures on MFCC"""
     print("Using MFCCs")
-    log_mels = make_vtlp_mels(sig,is_training,bins=40)
+    log_mels = make_vtlp_mels(sig,is_training,bins=40,window_ms=window_ms,stride_ms=stride_ms)
     mfccs = tf.contrib.signal.mfccs_from_log_mel_spectrograms(log_mels)[:,:,:num_mfccs]
     return mfccs
 

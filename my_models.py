@@ -20,6 +20,9 @@ def make_model(name,features,keep_prob,num_final_neurons,num_full_final_neurons,
     elif name == "mfccnet":
         print("MFCCNet")
         return mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == "ap-mfccnet":
+        print("Avg Pool MFCCNet")
+        return ap_mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
 
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
@@ -602,12 +605,13 @@ def full_resdilate(features,keep_prob,num_final_neurons,is_training):
 
 
 def capsnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
-    """Can I implement a Capsule Network? Probably not"""
+    """Can I implement a Capsule Network? Nah probs not"""
     fingerprint_4d = tf.reshape(features,[-1,100,120,1])
     c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
 
     def conv_capslayer(caps_in,num_caps,vec_size):
         """caps_in is a 5-d tensor, [batch,h,w,caps,vec_size]"""
+        return None
 
     # [batch,height,width,channels]
     # [batch,height,width,channels,vecsize]
@@ -631,6 +635,34 @@ def mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_train
     print(c.shape)
 
     c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
+
+    c = tf.contrib.layers.flatten(c)
+    print(c.shape)
+
+    fc = tf.contrib.layers.fully_connected(c,256,activation_fn=None)
+    fc = slim.batch_norm(fc,is_training=is_training,decay=0.95)
+    fc = tf.nn.relu(fc)
+    fc = tf.nn.dropout(fc,keep_prob)
+    print(fc)
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+
+    return final_layer, full_final_layer, fc
+
+def ap_mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """13 MFCCs, avg pooling"""
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+
+    c = conv2d(fingerprint_4d,64,[7,1],is_training)
+    c = conv2d(c,32,[1,1],is_training)
+    c = conv2d(c,256,[1,13],is_training,padding="VALID")
+    c = conv2d(c,128,[1,1],is_training)
+    c = conv2d(c,256,[7,1],is_training)
+    print(c.shape)
+
+    c = tf.nn.avg_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
 
     c = tf.contrib.layers.flatten(c)
     print(c.shape)
