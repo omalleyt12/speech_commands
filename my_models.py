@@ -20,9 +20,12 @@ def make_model(name,features,keep_prob,num_final_neurons,num_full_final_neurons,
     elif name == "mfccnet":
         print("MFCCNet")
         return mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
-    elif name == "ap-mfccnet":
+    elif name == "ap_mfccnet":
         print("Avg Pool MFCCNet")
         return ap_mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == "ap_overdrive":
+        print("Avg Pool Overdrive")
+        return ap_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
 
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
