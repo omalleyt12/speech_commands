@@ -243,6 +243,36 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neuron
     print(c.shape)
     return final_layer, full_final_layer, fc
 
+
+def ap_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """The Global Average Pool style of Overdrive, using 40 log-mels for simplicity"""
+    fingerprint_4d = tf.reshape(features,[-1,100,40,1])
+
+    c = conv2d(fingerprint_4d,64,[7,1],is_training)
+    c = conv2d(c,32,[1,1],is_training)
+
+    c = conv2d(c,64,[7,1],is_training)
+    c = conv2d(c,32,[1,1],is_training,mp=[1,4])
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,64,[1,1],is_training)
+
+    c = conv2d(c,64,[3,1],is_training,mp=[3,1])
+    c = tf.nn.dropout(c,keep_prob)
+
+    fc = slim.conv2d(c,num_final_neurons,[7,1],activation_fn=None)
+    fc = tf.nn.avg_pool(fc,[1,fc.shape[1],1,1],[1,fc.shape[1],1,1],"VALID")
+    fc = tf.contrib.layers.flatten(fc)
+
+    full_fc = slim.conv2d(c,num_full_final_neurons,[7,1],activation_fn=None)
+    full_fc = tf.nn.avg_pool(full_fc,[1,full_fc.shape[1],1,1],[1,full_fc.shape[1],1,1],"VALID")
+    full_fc = tf.contrib.layers.flatten(full_fc)
+
+    final_layer = fc
+    full_final_layer = full_fc
+    return final_layer, full_final_layer, fc
+
+
 def dilated_drive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
 
