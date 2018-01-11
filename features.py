@@ -93,7 +93,7 @@ def make_vtlp_mfccs(sig,is_training,name=None,num_mfccs=13):
     """This will be used to mirror Hello Edge or Heng's architectures on MFCC"""
     print("Using MFCCs")
     log_mels = make_vtlp_mels(sig,is_training,bins=40)
-    mfccs = tf.contrib.signal.mfccs_from_log_mel_spectrograms(log_mels)[:num_mfccs]
+    mfccs = tf.contrib.signal.mfccs_from_log_mel_spectrograms(log_mels)[:,:,:num_mfccs]
     return mfccs
 
 def multi_mels(sig,is_training,name=None,bins=120,stride_ms=5):
