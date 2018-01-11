@@ -18,7 +18,7 @@ def make_model(name,features,keep_prob,num_final_neurons,num_full_final_neurons,
         print("Dial Conv")
         return dilated_drive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
     elif name == "mfccnet":
-        prtin("MFCCNet")
+        print("MFCCNet")
         return mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
 
 def vggnet(features,keep_prob,num_final_neurons):
