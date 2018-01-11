@@ -628,15 +628,18 @@ def mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_train
     c = conv2d(c,256,[1,13],is_training,padding="VALID")
     c = conv2d(c,128,[1,1],is_training)
     c = conv2d(c,256,[7,1],is_training)
+    print(c.shape)
 
     c = tf.nn.max_pool(c,[1,c.shape[1],c.shape[2],1],[1,c.shape[1],c.shape[2],1],"VALID")
 
     c = tf.contrib.layers.flatten(c)
+    print(c.shape)
 
     fc = tf.contrib.layers.fully_connected(c,256,activation_fn=None)
     fc = slim.batch_norm(fc,is_training=is_training,decay=0.95)
     fc = tf.nn.relu(fc)
     fc = tf.nn.dropout(fc,keep_prob)
+    print(fc)
 
     full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons)
 
