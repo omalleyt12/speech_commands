@@ -629,7 +629,7 @@ def mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_train
     c = conv2d(c,128,[1,1],is_training)
     c = conv2d(c,256,[7,1],is_training)
 
-    c = tf.nn.max_pool(c,[1,c.shape[0],c.shape[1],1],[1,c.shape[0],c.shape[1],1],"VALID")
+    c = tf.nn.max_pool(c,[1,c.shape[1],c.shape[2],1],[1,c.shape[1],c.shape[2],1],"VALID")
 
     c = tf.contrib.layers.flatten(c)
 

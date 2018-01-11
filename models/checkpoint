@@ -1,2 +1,2 @@
-model_checkpoint_path: "overdrive_frame_eq.ckpt"
-all_model_checkpoint_paths: "overdrive_frame_eq.ckpt"
+model_checkpoint_path: "overdrive_no_noise.ckpt"
+all_model_checkpoint_paths: "overdrive_no_noise.ckpt"
