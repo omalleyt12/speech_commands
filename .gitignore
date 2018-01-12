@@ -1,3 +1,4 @@
+models/
 *.pb
 *errors_*
 *got_ems_*
