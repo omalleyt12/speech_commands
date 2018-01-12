@@ -13,7 +13,7 @@ def make_features(wavs,is_training,name="log-mel"):
     if name == "log-mel":
         return make_vtlp_mels(wavs,is_training,bins=120)
     elif name == "short-log-mel":
-        return make_vtlp_mels(wavs,is_training,bins=120,window_ms=16,stride_ms=8)
+        return make_vtlp_mels(wavs,is_training,bins=120,window_ms=16,stride_ms=10)
     elif name == "equal-log-mel":
         return make_vtlp_mels(wavs,is_training,bins=120,frame_equalize=True)
     elif name == "multi-mels":

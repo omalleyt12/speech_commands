@@ -30,7 +30,7 @@ save_to = "{}.pb".format(FLAGS.freeze)
 
 import numpy as np
 import tensorflow as tf
-# from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
+from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
 from tensorflow.python.framework import graph_util
 import preprocessing as pp
 import features as ft
@@ -44,17 +44,14 @@ slow_down = tf.constant(False)
 bg_wavs_ph = tf.constant(np.zeros((1,16000),np.float32))
 
 wav_data_placeholder = tf.placeholder(tf.string, [], name='wav_data')
-# decoded_sample_data = contrib_audio.decode_wav(
-#       wav_data_placeholder,
-#       desired_channels=1,
-#       desired_samples=16000,
-#       name='decoded_sample_data')
+decoded_sample_data = contrib_audio.decode_wav(
+      wav_data_placeholder,
+      desired_channels=1,
+      desired_samples=16000,
+      name='decoded_sample_data')
 
-wavs_ph, sr = tf.py_func(lambda x: (np.zeros((1,16000),np.float32),np.array([16000],np.float32)),[],Tout=[tf.float32,tf.float32],name="decoded_sample_data")
-print(wavs_ph.name)
-print(sr.name)
 
-wavs_ph = tf.reshape(wavs_ph,[1,16000])
+wavs_ph = tf.reshape(decoded_sample_data.audio,[1,16000])
 # final_layer = tf.contrib.layers.fully_connected(wavs_ph,12)
 processed_wavs = pp.tf_preprocess(wavs_ph,bg_wavs_ph,is_training_ph,slow_down)
 features = ft.make_features(processed_wavs,is_training_ph,FLAGS.features)

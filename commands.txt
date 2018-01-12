@@ -2,6 +2,12 @@ python tom_train_1.py --features log-mel --model overdrive --save overdrive --tr
 python tom_train_1.py --features log-mel --model overdrive --save overdrive_pl1 --pseudo_labels overdrive --train --no-val
 python tom_train_1.py --features log-mel --model overdrive --save overdrive_pl2 --pseudo_labels overdrive_pl1 --train --no-val
 python tom_train_1.py --features equal-log-mel --model overdrive --save overdrive_frame_eq --train --no-val --pseudo_labels overdrive
-# the command for the no-noise version of overdrive
+python tom_train_1.py --features log-mel --model overdrive --save overdrive_no_noise --train --no-val --no-noise
 python tom_train_1.py --features log-mel-40 --model okconv --save okconv --train --no-val
+python tom_train_1.py --features mfcc-13 --model mfccnet --save mfccnet --train --no-val
+python tom_train_1.py --features log-mel --model overdrive --save overdrive_10 --seed 10 --train --no-val
+python tom_train_semi.py --features log-mel --model overdrive --restore overdrive --save overdrive_semi --train --no-val --pseudo_labels overdrive --pseudo-tom
+python tom_train_1.py --features mfcc-13 --model mfccnet --save mfccnet_pl1 --train --no-val --pseudo_labels mfccnet
+python tom_train_1.py --features log-mel --model overdrive --save overdrive_10_pl1 --seed 10 --train --no-val --pseudo_labels overdrive_10
+python tom_train_1.py --features mfcc-13 --model mfccnet --save mfccnet_pl2 --train --no-val --pseudo_labels mfccnet_pl1
 

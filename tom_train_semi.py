@@ -139,7 +139,7 @@ def load_pseudo_labels():
 
     pseudo_silence = []
     pseudo_unknown = []
-    pseduo_wanted = []
+    pseudo_wanted = []
     for ele in pseudo_labels:
         d = {
             "data":wav_loader.load("test/audio/{}".format(ele["fname"]),sess),
@@ -215,7 +215,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         else:
             pseudo_int = np.random.randint(0,len(pseudo_wanted)-1)
             rec = pseudo_wanted[pseudo_int]
-            rec.append(rec["data"])
+            recs.append(rec["data"])
             labels.append(rec["guess"])
             label_weights.append(rec["prob"].max())
             sources.append(1)
@@ -240,7 +240,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                 # this might stop predicting it as silence, which would be weird but ok
                 pseudo_int = np.random.randint(0,len(pseudo_silence)-1)
                 rec = pseudo_silence[pseudo_int]
-                rec.append(rec["data"])
+                recs.append(rec["data"])
                 labels.append(rec["guess"])
                 label_weights.append(rec["prob"].max())
                 sources.append(2)
@@ -267,7 +267,7 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                     # this might stop predicting it as unknown, which would be weird but ok
                     pseudo_int = np.random.randint(0,len(pseudo_unknown)-1)
                     rec = pseudo_unknown[pseudo_int]
-                    rec.append(rec["data"])
+                    recs.append(rec["data"])
                     labels.append(rec["guess"])
                     label_weights.append(rec["prob"].max())
                     sources.append(3)
@@ -355,9 +355,9 @@ if FLAGS.pseudo_labels is not None:
 labels_ph = tf.placeholder(tf.int32,(None))
 wav_ph = tf.placeholder(tf.float32,(None,sample_rate))
 bg_wavs_ph = tf.placeholder(tf.float32,[None,sample_rate])
-label_weights_ph = tf.placeholder(tf.float32,(None))
-sources_ph = tf.placeholder(tf.int32,(None))
-samp_nums_ph = tf.placeholder(tf.int32,(None))
+label_weights_ph = tf.placeholder(tf.float32,(None),name="lb")
+sources_ph = tf.placeholder(tf.int32,(None),name="sources")
+samp_nums_ph = tf.placeholder(tf.int32,(None),name="samp_nums")
 
 keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
 learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
@@ -379,14 +379,14 @@ final_layer = tf.cond(use_full_layer,lambda: full_final_layer, lambda: final_lay
 
 probabilities = tf.nn.softmax(final_layer)
 
-loss = tf.pow(label_weights_ph,2)*tf.nn.softmax_cross_entropy_with_logits(labels=labels_ph,logits=final_layer)
+loss = tf.pow(label_weights_ph,2)*tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_ph,logits=final_layer)
 loss_mean = tf.reduce_mean(loss)
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 optimizer = tf.train.AdamOptimizer(learning_rate_ph)
 
 train_step = optimizer.minimize(loss_mean)
-full_train_step = optimizer.minimize(full_loss_mean)
+# full_train_step = optimizer.minimize(full_loss_mean)
 
 predictions = tf.argmax(final_layer,1,output_type=tf.int32)
 is_correct = tf.equal(labels_ph,predictions)
@@ -448,7 +448,7 @@ if FLAGS.train:
         feed_dict = get_batch(data_index["train"],batch_size,style=style)
         feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
         # now here's where we run the real, convnet part
-        _,sum_val,acc_val,loss_val,_,train_prob,train_sources,train_samp_nums = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step,probabilities,sources_ph,samp_nums_ph])
+        _,sum_val,acc_val,loss_val,_,train_prob,train_sources,train_samp_nums = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step,probabilities,sources_ph,samp_nums_ph],feed_dict)
         # this will update the probabilities and guessed label for the data that originated with the test set
         for batch_index, source_type in enumerate(train_sources):
             if source_type == 0:

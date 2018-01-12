@@ -248,19 +248,26 @@ def overdrive_full_bn(features,keep_prob,num_final_neurons,num_full_final_neuron
 
 
 def ap_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
-    """The Global Average Pool style of Overdrive, using 40 log-mels for simplicity"""
-    fingerprint_4d = tf.reshape(features,[-1,100,40,1])
+    """The Global Average Pool style of Overdrive, using 120 log-mels"""
+    fingerprint_4d = tf.reshape(features,[-1,100,120,1])
 
-    c = conv2d(fingerprint_4d,64,[7,1],is_training)
-    c = conv2d(c,32,[1,1],is_training)
-
-    c = conv2d(c,64,[7,1],is_training)
-    c = conv2d(c,32,[1,1],is_training,mp=[1,4])
+    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,128,[1,7],is_training,mp=[1,4])
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
     c = conv2d(c,64,[1,1],is_training)
+    c = conv2d(c,128,[3,1],is_training,mp=[2,1])
+    # c = conv2d(fingerprint_4d,64,[7,1],is_training)
+    # c = conv2d(c,32,[1,1],is_training)
 
-    c = conv2d(c,64,[3,1],is_training,mp=[3,1])
+    # c = conv2d(c,64,[7,1],is_training)
+    # c = conv2d(c,32,[1,1],is_training,mp=[1,4])
+
+    # c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    # c = conv2d(c,64,[1,1],is_training)
+
+    # c = conv2d(c,64,[3,1],is_training,mp=[3,1])
+
     c = tf.nn.dropout(c,keep_prob)
 
     fc = slim.conv2d(c,num_final_neurons,[7,1],activation_fn=None)
@@ -711,3 +718,16 @@ def ap_mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_tr
     final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
 
     return final_layer, full_final_layer, fc
+
+def simple1d(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """Simple 1d conving"""
+    f = tf.reshape(features,[-1,features.shape[1],1,1])
+    c = f
+
+    for channels in [8,16,32,64,128,256,512,512]:
+        c = conv2d(c,channels,[3,1],is_training)
+        c = conv2d(c,channels,[3,1],is_training,mp=[2,1])
+
+    return None
+
+
