@@ -26,6 +26,15 @@ def make_model(name,features,keep_prob,num_final_neurons,num_full_final_neurons,
     elif name == "ap_overdrive":
         print("Avg Pool Overdrive")
         return ap_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == "small_overdrive":
+        print("Small Overdrive")
+        return small_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == "smaller_overdrive":
+        print("Smaller Overdrive")
+        return smaller_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == "squeeze_overdrive":
+        print("Squueze Overdrive")
+        return squeeze_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
 
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
@@ -280,6 +289,80 @@ def ap_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_
 
     final_layer = fc
     full_final_layer = full_fc
+    return final_layer, full_final_layer, fc
+
+def small_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """Half the weights at initial levels"""
+    fingerprint_4d = tf.reshape(features,[-1,100,120,1])
+
+    c = conv2d(fingerprint_4d,32,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,64,[1,7],is_training,mp=[1,4])
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,256,[7,1],is_training,mp=[c.shape[1],1])
+
+    c = tf.contrib.layers.flatten(c)
+
+    fc = tf.contrib.slim.fully_connected(c,256)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.95)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons,activation_fn=None)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(c.shape)
+    return final_layer, full_final_layer, fc
+
+def smaller_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """Half the weights at initial levels"""
+    fingerprint_4d = tf.reshape(features,[-1,100,120,1])
+
+    c = conv2d(fingerprint_4d,32,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,32,[1,7],is_training,mp=[1,4])
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,128,[7,1],is_training,mp=[c.shape[1],1])
+
+    c = tf.contrib.layers.flatten(c)
+
+    fc = tf.contrib.slim.fully_connected(c,128)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.95)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons,activation_fn=None)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(c.shape)
+    return final_layer, full_final_layer, fc
+
+def squeeze_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    fingerprint_4d = tf.reshape(features,[-1,100,120,1])
+
+    c = conv2d(fingerprint_4d,64,[7,3],is_training)
+    c = conv2d(c,32,[1,1],is_training,mp=[1,3])
+
+    c = conv2d(c,128,[1,7],is_training)
+    c = conv2d(c,64,[1,1],is_training,mp=[1,4])
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = conv2d(c,64,[1,1],is_training)
+
+    c = conv2d(c,256,[7,1],is_training)
+    c = conv2d(c,128,[1,1],is_training,mp=[c.shape[1],1])
+
+    c = tf.contrib.layers.flatten(c)
+
+    fc = tf.contrib.slim.fully_connected(c,256)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.95)
+    fc = tf.nn.dropout(fc,keep_prob)
+
+
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons,activation_fn=None)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(c.shape)
     return final_layer, full_final_layer, fc
 
 

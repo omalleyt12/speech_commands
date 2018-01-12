@@ -28,7 +28,7 @@ def make_features(wavs,is_training,name="log-mel"):
     elif name == "mfcc-13":
         return make_vtlp_mfccs(wavs,is_training,num_mfccs=13)
     elif name == "short-mfcc-13":
-        return make_vtlp_mfccs(wavs,is_training,num_mfccs=13,window_ms=16,stride_ms=8)
+        return make_vtlp_mfccs(wavs,is_training,num_mfccs=13,window_ms=16,stride_ms=10)
     elif name == "mel":
         return make_vtlp_mels(wavs,is_training,bins=120,log=False)
     else:
