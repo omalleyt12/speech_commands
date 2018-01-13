@@ -44,6 +44,13 @@ Ok, at this point my priorities HAVE to be:
 		10) DON'T WANT TO - Heng's Log Mel models, 2 of them
 		11) The Hello Edge DS-CNN
 		12) The Hello Edge R-CNN
-	
-		
 
+4) Different strategies for Ensembling:
+
+- Try averaging the squares of predictions
+- Try averaging the square roots of predictions
+- Try making a second-layer model that combines the results of all models into one prediction???
+	
+5) I NEED TO FIGURE OUT WHAT IS SO WRONG WITH THE TEST DATA
+		
+6) Gated Convnets? Maxout Convnets? Try each on the Pseudo-labelled version

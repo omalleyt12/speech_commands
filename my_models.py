@@ -267,8 +267,7 @@ def ap_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_
     c = conv2d(c,128,[1,7],is_training,mp=[1,4])
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
-    c = conv2d(c,64,[1,1],is_training)
-    c = conv2d(c,128,[3,1],is_training,mp=[2,1])
+    c = conv2d(c,512,[3,1],is_training,mp=[2,1])
     # c = conv2d(fingerprint_4d,64,[7,1],is_training)
     # c = conv2d(c,32,[1,1],is_training)
 

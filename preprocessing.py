@@ -312,7 +312,7 @@ def red_noise(white_noise,r=0.5):
 #         bg_volume = 0
 #     return bg_volume*bg_combined
 
-def get_noise(bg_data,val=False,noise=True):
+def get_noise(bg_data,val=False,noise=True,super_noise=False):
     background_frequency = 0.8 if noise else 0.0
     max_background_volume = 0.1
     bg_index = np.random.randint(len(bg_data))
