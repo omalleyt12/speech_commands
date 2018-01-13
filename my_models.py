@@ -35,6 +35,9 @@ def make_model(name,features,keep_prob,num_final_neurons,num_full_final_neurons,
     elif name == "squeeze_overdrive":
         print("Squueze Overdrive")
         return squeeze_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == "crnn":
+        print("CRNN model")
+        return crnn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
 
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
@@ -467,8 +470,42 @@ def mega_multi_mel_model(features,keep_prob,num_final_neurons,num_full_final_neu
     print(c.shape)
     return final_layer, full_final_layer, fc
 
+def crnn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
+    """A convoutional, GRU model inspired by Hello Edge"""
+    fingerprint_4d = tf.reshape(features,[-1,100,120,1])
+
+    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,128,[1,7],is_training,mp=[1,4])
+
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = tf.reshape(c,[-1,c.shape[1],c.shape[3]])
+
+    cell_fw = []
+    RNN_units = 128
+    for i in range(2):
+        cell_fw.append(tf.contrib.rnn.GRUCell(RNN_units))
+    cells = tf.contrib.rnn.MultiRNNCell(cell_fw)
+    _, last = tf.nn.dynamic_rnn(cell=cells, inputs=c, dtype=tf.float32)
+    # lstmcell = tf.contrib.rnn.LSTMCell(144, use_peepholes=True, num_proj=98)
+    # _, last = tf.nn.dynamic_rnn(cell=lstmcell, inputs=c, dtype=tf.float32)
+    flow = last[-1]
+    print(c.shape)
+
+    # lstmcell = tf.contrib.rnn.LSTMCell(500, use_peepholes=True,num_proj=188)
+    # _, last = tf.nn.dynamic_rnn(cell=lstmcell, inputs=c,
+    #             dtype=tf.float32)
+    # flow = last[-1]
+
+    fc = slim.fully_connected(flow,256)
+    fc = tf.contrib.slim.batch_norm(fc,is_training=is_training,decay=0.95)
+    fc = tf.nn.dropout(fc,keep_prob)
 
 
+    full_final_layer = tf.contrib.layers.fully_connected(fc,num_full_final_neurons,activation_fn=None)
+
+    final_layer = tf.contrib.layers.fully_connected(fc,num_final_neurons,activation_fn=None)
+    print(c.shape)
+    return final_layer, full_final_layer, fc
 
 
 
