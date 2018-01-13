@@ -15,6 +15,9 @@ def make_features(wavs,is_training,name="log-mel"):
     elif name == "short-log-mel":
         print("Using short log mels")
         return make_vtlp_mels(wavs,is_training,bins=120,window_ms=16,stride_ms=10)
+    elif name == "long-log-mel":
+        print("Using long log mels")
+        return make_vtlp_mels(wavs,is_training,bins=120,window_ms=64,stride_ms=10)
     elif name == "equal-log-mel":
         return make_vtlp_mels(wavs,is_training,bins=120,frame_equalize=True)
     elif name == "multi-mels":

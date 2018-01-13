@@ -10,4 +10,11 @@ python tom_train_semi.py --features log-mel --model overdrive --restore overdriv
 python tom_train_1.py --features mfcc-13 --model mfccnet --save mfccnet_pl1 --train --no-val --pseudo_labels mfccnet
 python tom_train_1.py --features log-mel --model overdrive --save overdrive_10_pl1 --seed 10 --train --no-val --pseudo_labels overdrive_10
 python tom_train_1.py --features mfcc-13 --model mfccnet --save mfccnet_pl2 --train --no-val --pseudo_labels mfccnet_pl1
-
+python tom_train_1.py --features log-mel --model ap_overdrive --save ap_overdrive --train --no-val
+python tom_train_1.py --features log-mel --model small_overdrive --save small_overdrive --train --no-val
+python tom_train_1.py --features log-mel --model smaller_overdrive --save smaller_overdrive --train --no-val
+python tom_train_1.py --features log-mel --model squeeze_overdrive --save squeeze_overdrive --train --no-val
+python tom_train_1.py --features short-log-mel --model overdrive --save overdrive_short --train --no-val
+python tom_train_1.py --features log-mel --model overdrive --save overdrive_10_pl2 --pseudo_labels overdrive_10_pl1 --train --no-val --seed 10
+python tom_train_1.py --features short-log-mel --model overdrive --save overdrive_short_pl1 --pseudo_labels overdrive_short --train --no-val
+python tom_train_1.py --features short-log-mel --model overdrive --save overdrive_short_pl2 --pseudo_labels overdrive_short_pl1 --train --no-val

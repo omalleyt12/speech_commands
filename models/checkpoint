@@ -1,2 +1,2 @@
-model_checkpoint_path: "small_overdrive.ckpt"
-all_model_checkpoint_paths: "small_overdrive.ckpt"
+model_checkpoint_path: "squeeze_overdrive.ckpt"
+all_model_checkpoint_paths: "squeeze_overdrive.ckpt"

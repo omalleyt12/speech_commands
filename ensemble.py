@@ -10,9 +10,9 @@ import numpy as np
 wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","off","stop","go"]
 clips = defaultdict(list)
 
-for f in os.listdir("models"):
+for f in os.listdir("ensemble_models"):
     if ".pickle" in f:
-        with open("models/" + f,"rb") as f:
+        with open("ensemble_models/" + f,"rb") as f:
             test_info = pickle.load(f)
             for d in test_info:
                 clips[d["fname"]].append(d["all_prob"])
