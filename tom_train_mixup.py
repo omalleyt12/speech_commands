@@ -189,7 +189,15 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
         offset += 1 # only matters if mode != "train"
 
         rec = data_index[samp_index]
-        rec_data = rec["data"]
+
+        # this is the mixup part, mixup only bt knowns
+        if mode == "train":
+            samp2_index = np.random.randint(len(data_index))
+            alpha = 0.2
+            lam = np.random.beta(alpha+1,alpha)
+            rec_data = lam * rec["data"] + (1-lam)*data_index[samp2_index]["data"]
+        else:
+            rec_data = rec["data"]
 
         if mode != "comp":
             labels.append(rec["label_index"])
@@ -221,9 +229,16 @@ def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
                     # else:
                     rand_unknown = np.random.randint(0,len(unknown_index[mode]))
                     u_rec = unknown_index[mode][rand_unknown]["data"]
-                    recs.append(u_rec)
+                    rec = u_rec
                 else:
-                    recs.append(pseudo_unknown[np.random.randint(0,len(pseudo_unknown)-1)])
+                    rec = pseudo_unknown[np.random.randint(0,len(pseudo_unknown)-1)]
+
+                # mixup of unknowns with knowns
+                samp2_index = np.random.randint(len(data_index))
+                alpha = 0.2
+                lam = np.random.beta(alpha+1,alpha)
+                rec_data = lam * rec + (1-lam)*data_index[samp2_index]["data"]
+                recs.append(rec_data)
                 labels.append(1)
                 bg_wavs.append(pp.get_noise(bg_data,noise=FLAGS.noise,super_noise=FLAGS.super_noise)) # won't add noise to unknowns is flag is set
 
