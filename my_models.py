@@ -481,7 +481,7 @@ def crnn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training
     c = tf.reshape(c,[-1,c.shape[1],c.shape[3]])
 
     cell_fw = []
-    RNN_units = 128
+    RNN_units = 188
     for i in range(2):
         cell_fw.append(tf.contrib.rnn.GRUCell(RNN_units))
     cells = tf.contrib.rnn.MultiRNNCell(cell_fw)
