@@ -1,2 +1,2 @@
-model_checkpoint_path: "mfccnet_pl1.ckpt"
-all_model_checkpoint_paths: "mfccnet_pl1.ckpt"
+model_checkpoint_path: "overdrive_short_pl1.ckpt"
+all_model_checkpoint_paths: "overdrive_short_pl1.ckpt"
