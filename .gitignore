@@ -1,5 +1,5 @@
-ensemble_models/
-models/
+ensemble_models/*
+models/*
 *.pb
 *errors_*
 *got_ems_*
