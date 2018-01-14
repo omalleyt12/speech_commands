@@ -23,33 +23,34 @@ Ok, at this point my priorities HAVE to be:
 	- I will have to adopt argparsing so that I don't have to keep changing things, and can keep GH up-to-date
 3) Ensembling these models together
 	- Different models to try:
-		1) Models using short STFT window (16ms,8ms stride)
-		1) Models with no noise
-		1) Models using mixup data augmentation
-		1) Models that train on pseudo labels for silence and unknowns
+		1) Try a highly regularized L2 model version
+		DONE 1) Models using short STFT window (16ms,8ms stride)
+		DONE 1) Models with no noise
+		DONE 1) Models using mixup data augmentation
+		DONE 1) Models that train on pseudo labels for silence and unknowns
 		1) 5 Overdrive Pseudo-Label models with different seeds, since this is my best model
-		2) Ok Conv
-		3) An RNN version of Overdrive
+		DONE 2) Ok Conv
+		DONE 3) An RNN version of Overdrive
 		4) An average-pooled (at all levels) version of Overdrive
 		4) An average-pooled specialized Overdrive
-		4) An Overdrive that squeezes down the feature set with extrac convs
-		5) An Overdrive with less parameter
+		DONE 4) An Overdrive that squeezes down the feature set with extrac convs
+		DONE 5) An Overdrive with less parameter
 		4) A flat (or locally max-pooled) version of Overdrive
 		5) Overdrive models that were trained concurrently with the known unknowns
 		6) New Drive
 		7) Models that do volume equalization differently (avg vol, peak vol with larger strides)
-		8) DONE - Models that use frame-by-frame standardization
+		DONE 8) DONE - Models that use frame-by-frame standardization
 		8) DON'T WANT TO - Heng's MFCC models, 2 of them
 		9) Heng's Raw Wave models, 2 of them
 		10) DON'T WANT TO - Heng's Log Mel models, 2 of them
 		11) The Hello Edge DS-CNN
-		12) The Hello Edge R-CNN
+		DONEISH 12) The Hello Edge R-CNN
 
 4) Different strategies for Ensembling:
 
-- Try averaging the squares of predictions
-- Try averaging the square roots of predictions
-- Try making a second-layer model that combines the results of all models into one prediction???
+DONE, no - Try averaging the squares of predictions
+DONE, yes - Try averaging the square roots of predictions
+CAN'T DO WITHOUT RETRAINING - Try making a second-layer model that combines the results of all models into one prediction???
 	
 5) I NEED TO FIGURE OUT WHAT IS SO WRONG WITH THE TEST DATA
 		
