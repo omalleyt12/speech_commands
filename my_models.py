@@ -38,6 +38,9 @@ def make_model(name,features,keep_prob,num_final_neurons,num_full_final_neurons,
     elif name == "crnn":
         print("CRNN model")
         return crnn(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
+    elif name == "simple1d":
+        print("Simple 1d model")
+        return simple1d(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training)
 
 def vggnet(features,keep_prob,num_final_neurons):
     fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
@@ -834,10 +837,21 @@ def simple1d(features,keep_prob,num_final_neurons,num_full_final_neurons,is_trai
     f = tf.reshape(features,[-1,features.shape[1],1,1])
     c = f
 
-    for channels in [8,16,32,64,128,256,512,512]:
+    for channels in [8,16,32,64,128,256,512,512,1024,1024]:
         c = conv2d(c,channels,[3,1],is_training)
         c = conv2d(c,channels,[3,1],is_training,mp=[2,1])
+    c = tf.nn.dropout(c,keep_prob)
 
-    return None
+    fc = slim.conv2d(c,num_final_neurons,[3,1],activation_fn=None)
+    fc = tf.nn.avg_pool(fc,[1,fc.shape[1],1,1],[1,fc.shape[1],1,1],"VALID")
+    fc = tf.contrib.layers.flatten(fc)
+
+    full_fc = slim.conv2d(c,num_full_final_neurons,[7,1],activation_fn=None)
+    full_fc = tf.nn.avg_pool(full_fc,[1,full_fc.shape[1],1,1],[1,full_fc.shape[1],1,1],"VALID")
+    full_fc = tf.contrib.layers.flatten(full_fc)
+
+    final_layer = fc
+    full_final_layer = full_fc
+    return final_layer, full_final_layer, fc
 
 
