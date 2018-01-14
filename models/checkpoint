@@ -1,2 +1,0 @@
-model_checkpoint_path: "overdrive_mixup.ckpt"
-all_model_checkpoint_paths: "overdrive_mixup.ckpt"
