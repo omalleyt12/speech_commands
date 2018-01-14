@@ -19,7 +19,7 @@ for f in os.listdir("ensemble_models"):
 
 pred_list = []
 for fname, prob_list in clips.items():
-    guess = np.pow(np.stack(prob_list),2).mean(axis=0).argmax()
+    guess = np.power(np.stack(prob_list),2).mean(axis=0).argmax()
     pred_list.append({
         "fname":fname,
         "label":wanted_words[guess]

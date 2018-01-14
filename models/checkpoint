@@ -1,2 +1,2 @@
-model_checkpoint_path: "crnn_pl1.ckpt"
-all_model_checkpoint_paths: "crnn_pl1.ckpt"
+model_checkpoint_path: "overdrive_weighted_pl1.ckpt"
+all_model_checkpoint_paths: "overdrive_weighted_pl1.ckpt"

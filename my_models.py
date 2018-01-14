@@ -263,25 +263,15 @@ def ap_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_
     """The Global Average Pool style of Overdrive, using 120 log-mels"""
     fingerprint_4d = tf.reshape(features,[-1,100,120,1])
 
-    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
-    c = conv2d(c,128,[1,7],is_training,mp=[1,4])
+    c = conv2d(fingerprint_4d,64,[7,3],is_training)
+    c = tf.nn.avg_pool(c,[1,1,3,1],[1,1,3,1],"VALID")
+    c = conv2d(c,128,[1,7],is_training)
+    c = tf.nn.avg_pool(c,[1,1,4,1],[1,1,4,1],"VALID")
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
-    c = conv2d(c,512,[3,1],is_training,mp=[2,1])
-    # c = conv2d(fingerprint_4d,64,[7,1],is_training)
-    # c = conv2d(c,32,[1,1],is_training)
+    c = conv2d(c,128,[1,1],is_training)
 
-    # c = conv2d(c,64,[7,1],is_training)
-    # c = conv2d(c,32,[1,1],is_training,mp=[1,4])
-
-    # c = conv2d(c,256,[1,10],is_training,padding="VALID")
-    # c = conv2d(c,64,[1,1],is_training)
-
-    # c = conv2d(c,64,[3,1],is_training,mp=[3,1])
-
-    c = tf.nn.dropout(c,keep_prob)
-
-    fc = slim.conv2d(c,num_final_neurons,[7,1],activation_fn=None)
+    fc = slim.conv2d(c,num_final_neurons,[10,1],activation_fn=None)
     fc = tf.nn.avg_pool(fc,[1,fc.shape[1],1,1],[1,fc.shape[1],1,1],"VALID")
     fc = tf.contrib.layers.flatten(fc)
 
