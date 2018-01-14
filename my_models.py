@@ -269,7 +269,8 @@ def ap_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_
     c = tf.nn.avg_pool(c,[1,1,4,1],[1,1,4,1],"VALID")
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
-    c = conv2d(c,128,[1,1],is_training)
+    c = conv2d(c,256,[1,1],is_training)
+    c = tf.nn.dropout(c,keep_prob)
 
     fc = slim.conv2d(c,num_final_neurons,[10,1],activation_fn=None)
     fc = tf.nn.avg_pool(fc,[1,fc.shape[1],1,1],[1,fc.shape[1],1,1],"VALID")
