@@ -832,6 +832,14 @@ def ap_mfccnet(features,keep_prob,num_final_neurons,num_full_final_neurons,is_tr
 
     return final_layer, full_final_layer, fc
 
+def gated_conv2d(c,channels,kernel_size,is_training,stride=[1,1],padding="SAME",mp=None):
+    f = slim.conv2d(c,channels,kernel_size,activation_fn=None)
+    g = slim.conv2d(c,channels,kernel_size,activation_fn=tf.sigmoid)
+    c = f * g
+    if mp is not None:
+        c = tf.nn.max_pool(c,[1,mp[0],mp[1],1],[1,mp[0],mp[1],1],"VALID")
+    return slim.batch_norm(c,is_training=is_training,decay=0.95)
+
 def simple1d(features,keep_prob,num_final_neurons,num_full_final_neurons,is_training):
     """Simple 1d conving"""
     f = tf.reshape(features,[-1,features.shape[1],1,1])
@@ -854,4 +862,22 @@ def simple1d(features,keep_prob,num_final_neurons,num_full_final_neurons,is_trai
     full_final_layer = full_fc
     return final_layer, full_final_layer, fc
 
+def ctc_overdrive(features,seq_len,keep_prob,num_phonemes,is_training):
+    """A model designed to be used with CTC loss, using Overdrive's initial layers as inputs to the LSTMCell"""
+    fingerprint_4d = tf.reshape(features,[-1,features.shape[1],features.shape[2],1])
+    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,128,[1,7],is_training,mp=[1,4])
+    c = conv2d(c,256,[1,10],is_training,padding="VALID")
+    c = tf.reshape(c,[-1,100,256])
+    num_hidden = 256
+    num_layers = 1
+    cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+    stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers,
+                                        state_is_tuple=True)
+    outputs, _ = tf.nn.dynamic_rnn(stack, c, seq_len, dtype=tf.float32)
+    outputs = tf.reshape(outputs, [-1, num_hidden])
+    logits = slim.fully_connected(outputs,num_phonemes,activation_fn=None)
+    logits = tf.reshape(logits,[-1,100,num_phonemes])
+    logits = tf.transpose(logits, (1, 0, 2))
+    return logits
 

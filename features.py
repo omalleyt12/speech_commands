@@ -34,6 +34,9 @@ def make_features(wavs,is_training,name="log-mel"):
         return make_vtlp_mfccs(wavs,is_training,num_mfccs=13,window_ms=16,stride_ms=10)
     elif name == "mel":
         return make_vtlp_mels(wavs,is_training,bins=120,log=False)
+    elif name == "extreme-vtlp-mel":
+        print("Extreme VTLP Log Mels")
+        return make_vtlp_mels(wavs,is_training,bins=120,window_ms=30,stride_ms=10,extreme=True)
     else:
         print("Features: Identity")
         return wavs
@@ -56,13 +59,17 @@ def make_log_mel_fb(sig,name=None):
         log_mel_spectrograms = tf.log(mel_spectrograms + log_offset)
         return log_mel_spectrograms
 
-def make_vtlp_mels(sig,is_training,name=None,bins=128,log=True,frame_equalize=False,window_ms=30,stride_ms=10):
+def make_vtlp_mels(sig,is_training,name=None,bins=128,log=True,frame_equalize=False,window_ms=30,stride_ms=10,extreme=False):
     """A limitation with this approach is that the VTLP factor is the same within a batch, but individual VTLP did NOT help, so there's that"""
     print("Using {} Log-Mels".format(bins))
     window_size_samples = window_ms * 16
     window_stride_samples = stride_ms * 16
     with tf.name_scope(name,"audio_processing",[sig]) as scope:
-        vtlp = tf.cond(is_training,lambda: tf.truncated_normal([],1.0,0.1,dtype=tf.float64), lambda: tf.constant(1.0,tf.float64))
+        if extreme:
+            print("extreme warp mode activated")
+            vtlp = tf.cond(is_training,lambda: tf.random_uniform([],0.8,1.2,dtype=tf.float64), lambda: tf.constant(1.0,tf.float64))
+        else:
+            vtlp = tf.cond(is_training,lambda: tf.truncated_normal([],1.0,0.1,dtype=tf.float64), lambda: tf.constant(1.0,tf.float64))
         stfts = tf.contrib.signal.stft(sig, frame_length=window_size_samples, frame_step=window_stride_samples,pad_end=True)
         magnitude_spectrograms = tf.abs(stfts)
         # Warp the linear-scale, magnitude spectrograms into the mel-scale.
