@@ -11,10 +11,10 @@ from tensorflow.contrib.signal.python.ops import window_ops
 sample_rate = 16000
 
 
-def tf_preprocess(wavs,bg_wavs,is_training,slow_down):
+def tf_preprocess(wavs,bg_wavs,is_training,slow_down,extreme=False):
     def training_process(wavs,bg_wavs):
         # wavs = fast_pitch_shift(wavs)
-        wavs = fast_time_stretch(wavs)
+        wavs = fast_time_stretch(wavs,extreme=extreme)
         return tf.map_fn(train_preprocess,[wavs,bg_wavs],parallel_iterations=120,dtype=tf.float32,back_prop=False)
 
     def testing_process(wavs):
@@ -34,13 +34,17 @@ def test_preprocess(wav):
     return tf_volume_equalize(wav)
 
 
-def fast_time_stretch(signals,constant=False):
+def fast_time_stretch(signals,constant=False,extreme=False):
     def overlap(tup):
         framed_signals, frame_step_out = tup
         new_wav = reconstruction_ops.overlap_and_add(framed_signals,frame_step_out)
         return tf_get_word(new_wav)
 
-    speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
+    if extreme:
+        print("extreme time warp activated")
+        speedx = tf.random_uniform([tf.shape(signals)[0]],0.7,1.3)
+    else:
+        speedx = tf.truncated_normal([tf.shape(signals)[0]],1.0,0.2)
     frame_length = 300
     frame_step_in = int(300*0.25)
     frame_step_out = tf.cast(speedx*frame_step_in,tf.int32)

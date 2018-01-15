@@ -31,6 +31,7 @@ parser.add_argument(
 parser.add_argument(
     '--no-noise',dest="noise",action="store_false",default=True
 )
+parser.add_argument('--extreme-time',dest="extreme_time",action="store_true",default=False)
 parser.add_argument('--super-noise',dest="super_noise",action="store_true",default=False)
 parser.add_argument('--val',dest='val',action='store_true')
 parser.add_argument('--no-val',dest='val',action='store_false')
@@ -313,7 +314,7 @@ slow_down = tf.placeholder(tf.bool)
 # scale_means_ph = tf.placeholder(tf.float32)
 # scale_stds_ph = tf.placeholder(tf.float32)
 
-processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph,slow_down)
+processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph,slow_down,extreme=FLAGS.extreme_time)
 
 features = make_features(processed_wavs,is_training_ph,FLAGS.features)
 
