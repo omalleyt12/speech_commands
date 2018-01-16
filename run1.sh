@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-python tom_train_1.py --features identity --model simple1d --save simple1d --train --no-val
-python tom_train_1.py --features identity --model simple1d --save simple1d_pl1 --train --no-val --pseudo_labels simple1d
+python tom_train_1.py --features log-mel --model small_overdrive --save pi_new_small_overdrive --train --no-val --pseudo_labels overdrive
+python tom_train_1.py --features log-mel --model newdrive --save pi_new_newdrive --train --no-val --pseudo_labels overdrive
 
 
 

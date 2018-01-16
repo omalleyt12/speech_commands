@@ -291,8 +291,8 @@ def small_overdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,
     """Half the weights at initial levels"""
     fingerprint_4d = tf.reshape(features,[-1,100,120,1])
 
-    c = conv2d(fingerprint_4d,64,[7,3],is_training,mp=[1,3])
-    c = conv2d(c,96,[1,7],is_training,mp=[1,4])
+    c = conv2d(fingerprint_4d,32,[7,3],is_training,mp=[1,3])
+    c = conv2d(c,64,[1,7],is_training,mp=[1,4])
 
     c = conv2d(c,256,[1,10],is_training,padding="VALID")
     c = conv2d(c,256,[7,1],is_training,mp=[c.shape[1],1])
@@ -574,7 +574,7 @@ def newdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_trai
     f = tf.reshape(features,[-1,100,120,1])
     print(f.shape)
 
-    c = slim.conv2d(f,64,[7,1],activation_fn=None)
+    c = slim.conv2d(f,32,[7,1],activation_fn=None)
     c = slim.batch_norm(c,is_training=is_training,decay=0.95)
     c = tf.nn.relu(c)
     print(c.shape)
@@ -585,7 +585,7 @@ def newdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_trai
     c = tf.nn.max_pool(c,[1,1,3,1],[1,1,3,1],"VALID")
     print(c.shape)
 
-    c = slim.separable_conv2d(c,128,[1,7],1,activation_fn=None)
+    c = slim.separable_conv2d(c,96,[1,7],1,activation_fn=None)
     c = slim.batch_norm(c,is_training=is_training,decay=0.95)
     c = tf.nn.relu(c)
     c = tf.nn.max_pool(c,[1,1,4,1],[1,1,4,1],"VALID")
@@ -596,7 +596,7 @@ def newdrive(features,keep_prob,num_final_neurons,num_full_final_neurons,is_trai
     c = tf.nn.relu(c)
     print(c.shape)
 
-    c = slim.separable_conv2d(c,512,[7,1],1,activation_fn=None)
+    c = slim.separable_conv2d(c,256,[7,1],1,activation_fn=None)
     c = slim.batch_norm(c,is_training=is_training,decay=0.95)
     c = tf.nn.relu(c)
     c = tf.nn.max_pool(c,[1,c.shape[1],1,1],[1,c.shape[1],1,1],"VALID")
