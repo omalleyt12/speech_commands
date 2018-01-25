@@ -1,428 +1,500 @@
-# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-r"""Simple speech recognition to spot a limited number of keywords.
-
-This is a self-contained example script that will train a very basic audio
-recognition model in TensorFlow. It downloads the necessary training data and
-runs with reasonable defaults to train within a few hours even only using a CPU.
-For more information, please see
-https://www.tensorflow.org/tutorials/audio_recognition.
-
-It is intended as an introduction to using neural networks for audio
-recognition, and is not a full speech recognition system. For more advanced
-speech systems, I recommend looking into Kaldi. This network uses a keyword
-detection style to spot discrete words from a small vocabulary, consisting of
-"yes", "no", "up", "down", "left", "right", "on", "off", "stop", and "go".
-
-To run the training process, use:
-
-bazel run tensorflow/examples/speech_commands:train
-
-This will write out checkpoints to /tmp/speech_commands_train/, and will
-download over 1GB of open source training data, so you'll need enough free space
-and a good internet connection. The default data is a collection of thousands of
-one-second .wav files, each containing one spoken word. This data set is
-collected from https://aiyprojects.withgoogle.com/open_speech_recording, please
-consider contributing to help improve this and other models!
-
-As training progresses, it will print out its accuracy metrics, which should
-rise above 90% by the end. Once it's complete, you can run the freeze script to
-get a binary GraphDef that you can easily deploy on mobile applications.
-
-If you want to train on your own data, you'll need to create .wavs with your
-recordings, all at a consistent length, and then arrange them into subfolders
-organized by label. For example, here's a possible file structure:
-
-my_wavs >
-  up >
-    audio_0.wav
-    audio_1.wav
-  down >
-    audio_2.wav
-    audio_3.wav
-  other>
-    audio_4.wav
-    audio_5.wav
-
-You'll also need to tell the script what labels to look for, using the
-`--wanted_words` argument. In this case, 'up,down' might be what you want, and
-the audio in the 'other' folder would be used to train an 'unknown' category.
-
-To pull this all together, you'd run:
-
-bazel run tensorflow/examples/speech_commands:train -- \
---data_dir=my_wavs --wanted_words=up,down
-
-"""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import argparse
-import os.path
-import sys
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+   '--features',
+    type=str,
+    default='blah')
+parser.add_argument(
+    '--model',
+    type=str,
+    default='blah'
+)
+parser.add_argument(
+    '--save',
+    type=str,
+    default='blah'
+)
+parser.add_argument(
+    '--seed',
+    type=int,
+    default=0
+)
+parser.add_argument(
+    '--pseudo_labels',
+    type=str,
+    default=None
+)
+parser.add_argument(
+    '--pseudo-tom',dest="pseudo_tom",action="store_true",default=False
+)
+parser.add_argument(
+    '--no-noise',dest="noise",action="store_false",default=True
+)
+parser.add_argument('--extreme-time',dest="extreme_time",action="store_true",default=False)
+parser.add_argument('--super-noise',dest="super_noise",action="store_true",default=False)
+parser.add_argument('--val',dest='val',action='store_true')
+parser.add_argument('--no-val',dest='val',action='store_false')
+parser.add_argument('--train',dest="train",action='store_true')
+parser.add_argument('--no-train',dest="train",action='store_false')
+
+FLAGS, unparsed = parser.parse_known_args()
+
+
+wanted_words = ["silence","unknown","yes","no","up","down","left","right","on","off","stop","go"]
+all_words = wanted_words +["one","bed","bird","cat","dog","eight","five","four","happy","house","marvin","nine","seven","sheila","six","three","tree","two","wow","zero"]
+all_words_index = {w:i for i,w in enumerate(all_words)}
+
+import pickle
+import libmr
+import scipy.spatial.distance as spd
+import pandas as pd
+import re
+import math
+import os
+import random
 import numpy as np
-from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
-
-import input_data
-import models
 from tensorflow.python.platform import gfile
+from tensorflow.python.ops import io_ops
+from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
+import scipy.io.wavfile as sciwav
+import preprocessing as pp
+import wav_loader as wl
+import utils
+from features import make_features
+from models import *
+from running_average import RunningAverage
 
-FLAGS = None
+def play(a):
+    import winsound
+    import scipy.io.wavfile as sciwav
+    print(a.shape)
+    sciwav.write("testing.wav",16000,a)
+    winsound.PlaySound("testing.wav",winsound.SND_FILENAME)
+
+style = "unknown"
+train_keep_prob = 0.5
+batch_size = 100
+eval_step = 500
+steps = 2000000
+no_val_steps = [1000,1000,1000,3000,3000,5000,3000,1]
+no_val_lr = [0.01,0.005,0.0025,0.001,0.0005,0.0001,0.00005,1e-8]
+# no_val_steps = [15,15,15]
+# no_val_lr = [0.01,0.001,1e-8]
+learning_rate = 0.01
+# decay_every = 2000
+decay_rate = 0.10
+sample_rate = 16000 # per sec
+silence_percentage = 10.0 # what percent of training data should be silence
+unknown_percentage = 10.0 # what percent of training data should be unknown words
+true_unknown_percentage = 10.0 # what percent of words should be complete goobledyguk
 
 
-def main(_):
-  # We want to see all the logging messages for this tutorial.
-  tf.logging.set_verbosity(tf.logging.INFO)
+sess = tf.InteractiveSession()
+np.random.seed(FLAGS.seed)
+tf.set_random_seed(FLAGS.seed)
+from keras import backend as K
+K.set_session(sess)
 
-  # Start a new TensorFlow session.
-  sess = tf.InteractiveSession()
+def load_train_data(style="full"):
+    """
+    Style controls whether it learns all labels and then maps unwanted to unknown ("full"), or learns the unknown label directly ("unknown").
+    Theoretically, option 1 should help it learn better features, but option 2 may help it generalize better.
+    """
+    random.seed(111)
+    data_index = {"val":[],"test":[],"train":[]}
+    unknown_index = {"val":[],"test":[],"train":[]}
 
-  # Begin by making sure we have the training data we need. If you already have
-  # training data of your own, use `--data_url= ` on the command line to avoid
-  # downloading.
-  model_settings = models.prepare_model_settings(
-      len(input_data.prepare_words_list(FLAGS.wanted_words.split(','))),
-      FLAGS.sample_rate, FLAGS.clip_duration_ms, FLAGS.window_size_ms,
-      FLAGS.window_stride_ms, FLAGS.dct_coefficient_count)
-  audio_processor = input_data.AudioProcessor(
-      FLAGS.data_url, FLAGS.data_dir, FLAGS.silence_percentage,
-      FLAGS.unknown_percentage,
-      FLAGS.wanted_words.split(','), FLAGS.validation_percentage,
-      FLAGS.testing_percentage, model_settings)
-  fingerprint_size = model_settings['fingerprint_size']
-  label_count = model_settings['label_count']
-  time_shift_samples = int((FLAGS.time_shift_ms * FLAGS.sample_rate) / 1000)
-  # Figure out the learning rates for each training phase. Since it's often
-  # effective to have high learning rates at the start of training, followed by
-  # lower levels towards the end, the number of steps and learning rates can be
-  # specified as comma-separated lists to define the rate at each stage. For
-  # example --how_many_training_steps=10000,3000 --learning_rate=0.001,0.0001
-  # will run 13,000 training loops in total, with a rate of 0.001 for the first
-  # 10,000, and 0.0001 for the final 3,000.
-  training_steps_list = list(map(int, FLAGS.how_many_training_steps.split(',')))
-  learning_rates_list = list(map(float, FLAGS.learning_rate.split(',')))
-  if len(training_steps_list) != len(learning_rates_list):
-    raise Exception(
-        '--how_many_training_steps and --learning_rate must be equal length '
-        'lists, but are %d and %d long instead' % (len(training_steps_list),
-                                                   len(learning_rates_list)))
-
-  fingerprint_input = tf.placeholder(
-      tf.float32, [None, fingerprint_size], name='fingerprint_input')
-
-  logits, dropout_prob = models.create_model(
-      fingerprint_input,
-      model_settings,
-      FLAGS.model_architecture,
-      is_training=True)
-
-  # Define loss and optimizer
-  ground_truth_input = tf.placeholder(
-      tf.int64, [None], name='groundtruth_input')
-
-  # Optionally we can add runtime checks to spot when NaNs or other symptoms of
-  # numerical errors start occurring during training.
-  control_dependencies = []
-  if FLAGS.check_nans:
-    checks = tf.add_check_numerics_ops()
-    control_dependencies = [checks]
-
-  # Create the back propagation and training evaluation machinery in the graph.
-  with tf.name_scope('cross_entropy'):
-    cross_entropy_mean = tf.losses.sparse_softmax_cross_entropy(
-        labels=ground_truth_input, logits=logits)
-  tf.summary.scalar('cross_entropy', cross_entropy_mean)
-  with tf.name_scope('train'), tf.control_dependencies(control_dependencies):
-    learning_rate_input = tf.placeholder(
-        tf.float32, [], name='learning_rate_input')
-    train_step = tf.train.GradientDescentOptimizer(
-        learning_rate_input).minimize(cross_entropy_mean)
-  predicted_indices = tf.argmax(logits, 1)
-  correct_prediction = tf.equal(predicted_indices, ground_truth_input)
-  confusion_matrix = tf.confusion_matrix(
-      ground_truth_input, predicted_indices, num_classes=label_count)
-  evaluation_step = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-  tf.summary.scalar('accuracy', evaluation_step)
-
-  global_step = tf.train.get_or_create_global_step()
-  increment_global_step = tf.assign(global_step, global_step + 1)
-
-  saver = tf.train.Saver(tf.global_variables())
-
-  # Merge all the summaries and write them out to /tmp/retrain_logs (by default)
-  merged_summaries = tf.summary.merge_all()
-  train_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/train',
-                                       sess.graph)
-  validation_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/validation')
-
-  tf.global_variables_initializer().run()
-
-  start_step = 1
-
-  if FLAGS.start_checkpoint:
-    models.load_variables_from_checkpoint(sess, FLAGS.start_checkpoint)
-    start_step = global_step.eval(session=sess)
-
-  tf.logging.info('Training from step: %d ', start_step)
-
-  # Save graph.pbtxt.
-  tf.train.write_graph(sess.graph_def, FLAGS.train_dir,
-                       FLAGS.model_architecture + '.pbtxt')
-
-  # Save list of words.
-  with gfile.GFile(
-      os.path.join(FLAGS.train_dir, FLAGS.model_architecture + '_labels.txt'),
-      'w') as f:
-    f.write('\n'.join(audio_processor.words_list))
-
-  # Training loop.
-  training_steps_max = np.sum(training_steps_list)
-  for training_step in xrange(start_step, training_steps_max + 1):
-    # Figure out what the current learning rate is.
-    training_steps_sum = 0
-    for i in range(len(training_steps_list)):
-      training_steps_sum += training_steps_list[i]
-      if training_step <= training_steps_sum:
-        learning_rate_value = learning_rates_list[i]
-        break
-    # Pull the audio samples we'll use for training.
-    train_fingerprints, train_ground_truth = audio_processor.get_data(
-        FLAGS.batch_size, 0, model_settings, FLAGS.background_frequency,
-        FLAGS.background_volume, time_shift_samples, 'training', sess)
-    # Run the graph with this batch of training data.
-    train_summary, train_accuracy, cross_entropy_value, _, _ = sess.run(
-        [
-            merged_summaries, evaluation_step, cross_entropy_mean, train_step,
-            increment_global_step
-        ],
-        feed_dict={
-            fingerprint_input: train_fingerprints,
-            ground_truth_input: train_ground_truth,
-            learning_rate_input: learning_rate_value,
-            dropout_prob: 0.5
-        })
-    train_writer.add_summary(train_summary, training_step)
-    tf.logging.info('Step #%d: rate %f, accuracy %.1f%%, cross entropy %f' %
-                    (training_step, learning_rate_value, train_accuracy * 100,
-                     cross_entropy_value))
-    is_last_step = (training_step == training_steps_max)
-    if (training_step % FLAGS.eval_step_interval) == 0 or is_last_step:
-      set_size = audio_processor.set_size('validation')
-      total_accuracy = 0
-      total_conf_matrix = None
-      for i in xrange(0, set_size, FLAGS.batch_size):
-        validation_fingerprints, validation_ground_truth = (
-            audio_processor.get_data(FLAGS.batch_size, i, model_settings, 0.0,
-                                     0.0, 0, 'validation', sess))
-        # Run a validation step and capture training summaries for TensorBoard
-        # with the `merged` op.
-        validation_summary, validation_accuracy, conf_matrix = sess.run(
-            [merged_summaries, evaluation_step, confusion_matrix],
-            feed_dict={
-                fingerprint_input: validation_fingerprints,
-                ground_truth_input: validation_ground_truth,
-                dropout_prob: 1.0
-            })
-        validation_writer.add_summary(validation_summary, training_step)
-        batch_size = min(FLAGS.batch_size, set_size - i)
-        total_accuracy += (validation_accuracy * batch_size) / set_size
-        if total_conf_matrix is None:
-          total_conf_matrix = conf_matrix
+    wav_loader = wl.WavLoader("train_wav_loader",desired_samples=sample_rate)
+    for i,wav_path in enumerate(gfile.Glob("train/audio/*/*.wav")):
+        if i % 1000 == 0: print("Loading training " + str(i))
+        word = os.path.split(os.path.dirname(wav_path))[-1].lower()
+        if word == "_background_noise_":
+            continue # don't include yet
+        set_name = utils.which_set(wav_path) if FLAGS.val else "train"
+        d = {"file":wav_path,"data":wav_loader.load(wav_path,sess)}
+        if style == "full" or word in wanted_words:
+            d.update({"label":word,"label_index":all_words_index[word]})
+            d.update({"word":word})
+            data_index[set_name].append(d)
         else:
-          total_conf_matrix += conf_matrix
-      tf.logging.info('Confusion Matrix:\n %s' % (total_conf_matrix))
-      tf.logging.info('Step %d: Validation accuracy = %.1f%% (N=%d)' %
-                      (training_step, total_accuracy * 100, set_size))
+            d.update({"label":"unknown","label_index":1})
+            d.update({"word":word})
+        if word not in wanted_words: # this will be populated for both styles
+            unknown_index[set_name].append(d)
 
-    # Save the model checkpoint periodically.
-    if (training_step % FLAGS.save_step_interval == 0 or
-        training_step == training_steps_max):
-      checkpoint_path = os.path.join(FLAGS.train_dir,
-                                     FLAGS.model_architecture + '.ckpt')
-      tf.logging.info('Saving to "%s-%d"', checkpoint_path, training_step)
-      saver.save(sess, checkpoint_path, global_step=training_step)
+    # randomize each set
+    for set_name in ['val','test','train']:
+        random.shuffle(data_index[set_name])
 
-  set_size = audio_processor.set_size('testing')
-  tf.logging.info('set_size=%d', set_size)
-  total_accuracy = 0
-  total_conf_matrix = None
-  for i in xrange(0, set_size, FLAGS.batch_size):
-    test_fingerprints, test_ground_truth = audio_processor.get_data(
-        FLAGS.batch_size, i, model_settings, 0.0, 0.0, 0, 'testing', sess)
-    test_accuracy, conf_matrix = sess.run(
-        [evaluation_step, confusion_matrix],
-        feed_dict={
-            fingerprint_input: test_fingerprints,
-            ground_truth_input: test_ground_truth,
-            dropout_prob: 1.0
+    return data_index, unknown_index
+
+def load_pseudo_labels():
+    print("Loading Pseudo Labels")
+    wav_loader = wl.WavLoader("pseudo_silence_loader",desired_samples=sample_rate)
+    with open("models/{}_comp.pickle".format(FLAGS.pseudo_labels),"rb") as f:
+        pseudo_labels = pickle.load(f)
+
+    pseudo_silence = []
+    pseudo_unknown = []
+    for ele in pseudo_labels:
+        if ele["guess"] == "silence":
+            pseudo_silence.append(wav_loader.load("test/audio/{}".format(ele["fname"]),sess))
+        elif ele["guess"] == "unknown":
+            pseudo_unknown.append(wav_loader.load("test/audio/{}".format(ele["fname"]),sess))
+    return pseudo_silence, pseudo_unknown
+
+
+
+def get_speakers(unknown_index,data_index):
+    """Organize unknowns into speakers who have spoken two or more different words"""
+    def unique_words(l):
+        new_l = []
+        should_add = True
+        for ele in l:
+            for new_ele in new_l:
+                if new_ele["word"] == ele["word"]:
+                     should_add = False
+            if should_add:
+                new_l.append(ele)
+        return new_l
+
+    full_index = {}
+    for set_name in ["train","val","test"]:
+        full_index[set_name] = unknown_index[set_name] + data_index[set_name]
+
+    from collections import defaultdict
+    speakers = {}
+    for set_name in ['val','test','train']:
+        speakers[set_name] = defaultdict(list)
+        for i,rec in enumerate(full_index[set_name]):
+            speaker = re.sub(r'_nohash_.*$','',os.path.basename(rec["file"]))
+            speakers[set_name][speaker].append(rec)
+        speakers[set_name] = speakers[set_name].items( )
+        speakers[set_name] = [(u[0],unique_words(u[1])) for u in speakers[set_name]]
+        speakers[set_name] = [u for u in speakers[set_name] if len(u[1]) > 2]
+    return speakers
+
+
+def get_batch(data_index,batch_size,offset=0,mode="train",style="full"):
+    """Does preprocessing of WAVs and returns the feed_dict for a batch"""
+    recs = []
+    labels = []
+    bg_wavs = []
+    if offset + batch_size > len(data_index):
+        batch_size = len(data_index) - offset
+
+    for j in range(batch_size):
+        samp_index = np.random.randint(len(data_index)) if mode == "train" else offset
+        offset += 1 # only matters if mode != "train"
+
+        rec = data_index[samp_index]
+        rec_data = rec["data"]
+
+        if mode != "comp":
+            labels.append(rec["label_index"])
+        recs.append(rec_data)
+        bg_wavs.append(pp.get_noise(bg_data,noise=FLAGS.noise,super_noise=FLAGS.super_noise)) # won't add noise to regular examples if flag is set
+
+    if mode != "comp": # add silence and unknowns to batches randomly
+        silence_recs = int(batch_size * silence_percentage / 100)
+        for j in range(silence_recs):
+            pseudo_picker = 0 if mode == "val" or FLAGS.pseudo_labels is None else np.random.uniform(0,1)
+            if pseudo_picker < 0.5:
+                silence_rec = np.zeros(sample_rate,dtype=np.float32) 
+                if mode == "val":
+                    silence_rec += pp.get_noise(bg_data,val=True,super_noise=FLAGS.super_noise) # since noise won't be added to any val data records
+                recs.append(silence_rec)
+            else:
+                recs.append(pseudo_silence[np.random.randint(0,len(pseudo_silence)-1)])
+
+            labels.append(all_words_index["silence"])
+            bg_wavs.append(pp.get_noise(bg_data))
+
+        if style != "full":
+            unknown_recs = int(batch_size * unknown_percentage / 100)
+            for j in range(unknown_recs):
+                pseudo_picker = 0 if mode == "val" or FLAGS.pseudo_labels is None else np.random.uniform(0,1)
+                if pseudo_picker < 0.5:
+                    # if mode == "val": # Try and make val more deterministic
+                    #     rand_unknown = offset + j
+                    # else:
+                    rand_unknown = np.random.randint(0,len(unknown_index[mode]))
+                    u_rec = unknown_index[mode][rand_unknown]["data"]
+                    recs.append(u_rec)
+                else:
+                    recs.append(pseudo_unknown[np.random.randint(0,len(pseudo_unknown)-1)])
+                labels.append(1)
+                bg_wavs.append(pp.get_noise(bg_data,noise=FLAGS.noise,super_noise=FLAGS.super_noise)) # won't add noise to unknowns is flag is set
+
+    feed_dict={ wav_ph: np.stack(recs), bg_wavs_ph: np.stack(bg_wavs), use_full_layer: False, slow_down: False}
+    if mode != "comp":
+        feed_dict[labels_ph] = np.stack(labels).astype(np.int32)
+    return feed_dict
+
+def run_validation(set_name,step):
+    # update the variance on batch normalization without dropout
+    # for _ in range(50):
+    #     feed_dict = get_batch(data_index["train"],batch_size,style=style)
+    #     feed_dict.update({keep_prob: 1.0,learning_rate_ph:learning_rate,is_training_ph: False})
+    #     up_blah,loss_blah = sess.run([update_ops,loss_mean],feed_dict)
+    if set_name == "train":
+        from collections import defaultdict
+        AVs = defaultdict(list)
+    val_size = len(data_index[set_name])
+    val_offset = 0
+    val_acc = RunningAverage()
+    val_loss = RunningAverage()
+    val_conf_mat = np.zeros((output_neurons,output_neurons))
+    pred_df_list = []
+    errors = []
+    got_ems = []
+    while val_offset < val_size:
+        feed_dict = get_batch(data_index[set_name],batch_size,offset=val_offset,mode="val",style=style)
+        feed_dict.update({keep_prob:1.0,is_training_ph:False})
+        open_max, val_correct, val_pred,val_sum_val,val_acc_val,val_loss_val,val_conf_mat_val = sess.run([open_max_layer,is_correct,predictions,merged_summaries,accuracy_tensor,loss_mean,confusion_matrix],feed_dict)
+        val_writer.add_summary(val_sum_val,step)
+        val_acc.add(val_acc_val)
+        val_loss.add(val_loss_val)
+        val_conf_mat += val_conf_mat_val
+        val_offset += batch_size
+        val_pred_list = list(val_pred)
+
+        for i,guess in enumerate(list(val_correct)):
+            if not guess:
+                errors.append({
+                    "data":feed_dict[wav_ph][i],
+                    "guess":val_pred[i],
+                    "label":feed_dict[labels_ph][i]
+                })
+            else:
+                got_ems.append({
+                    "data":feed_dict[wav_ph][i],
+                    "guess":val_pred[i],
+                    "label":feed_dict[labels_ph][i]
+                })
+
+
+    with open("errors_{}".format(set_name),"wb") as f:
+        pickle.dump(errors,f)
+    with open("got_ems_{}".format(set_name),"wb") as f:
+        pickle.dump(got_ems,f)
+
+
+    tf.logging.info("{} Step {} LR {} Accuracy {} Loss {}".format(set_name,step,learning_rate,val_acc,val_loss))
+    df_words = all_words if style == "full" else wanted_words
+
+    pd.DataFrame(val_conf_mat,columns=df_words,index=df_words).to_csv("confusion_matrix_{}.csv".format(set_name))
+
+
+    return val_loss.calculate(), val_acc.calculate()
+
+if FLAGS.train:
+    data_index, unknown_index = load_train_data(style=style)
+    print("Length of unknown_index for train {}".format(len(unknown_index["train"])))
+    print("Length of training data {}".format(len(data_index["train"])))
+    # full_data_index, _ = load_train_data("full")
+    # speakers = get_speakers(unknown_index,data_index)
+bg_data = wl.load_bg_data(sess)
+
+if FLAGS.pseudo_labels is not None:
+    pseudo_silence, pseudo_unknown = load_pseudo_labels()
+
+
+labels_ph = tf.placeholder(tf.int32,(None))
+wav_ph = tf.placeholder(tf.float32,(None,sample_rate))
+bg_wavs_ph = tf.placeholder(tf.float32,[None,sample_rate])
+
+keep_prob = tf.placeholder(tf.float32) # will be 0.5 for training, 1 for test
+learning_rate_ph = tf.placeholder(tf.float32,[],name="learning_rate_ph")
+is_training_ph = tf.placeholder(tf.bool)
+use_full_layer = tf.placeholder(tf.bool)
+slow_down = tf.placeholder(tf.bool)
+# scale_means_ph = tf.placeholder(tf.float32)
+# scale_stds_ph = tf.placeholder(tf.float32)
+
+processed_wavs = pp.tf_preprocess(wav_ph,bg_wavs_ph,is_training_ph,slow_down,extreme=FLAGS.extreme_time)
+
+features = make_features(processed_wavs,is_training_ph,FLAGS.features)
+
+output_neurons = len(all_words) if style == "full" else len(wanted_words)
+full_output_neurons = len(all_words)
+final_layer, full_final_layer, open_max_layer = make_model(FLAGS.model,features,keep_prob,output_neurons,full_output_neurons,is_training_ph)
+
+final_layer = tf.cond(use_full_layer,lambda: full_final_layer, lambda: final_layer)
+
+probabilities = tf.nn.softmax(final_layer)
+
+loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph, logits=final_layer)
+# full_loss_mean = tf.losses.sparse_softmax_cross_entropy(labels=labels_ph,logits=full_final_layer)
+
+total_loss = tf.losses.get_total_loss()
+
+update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+optimizer = tf.train.AdamOptimizer(learning_rate_ph)
+
+train_step = optimizer.minimize(total_loss)
+# full_train_step = optimizer.minimize(full_loss_mean)
+
+predictions = tf.argmax(final_layer,1,output_type=tf.int32)
+is_correct = tf.equal(labels_ph,predictions)
+confusion_matrix = tf.confusion_matrix(labels_ph,predictions,num_classes=output_neurons)
+accuracy_tensor = tf.reduce_mean(tf.cast(is_correct,tf.float32))
+global_step = tf.train.get_or_create_global_step()
+increment_global_step = tf.assign(global_step,global_step + 1)
+
+saver = tf.train.Saver(tf.global_variables())
+tf.summary.scalar("cross_entropy",loss_mean)
+tf.summary.scalar("accuracy",accuracy_tensor)
+merged_summaries = tf.summary.merge_all()
+train_writer = tf.summary.FileWriter("logs/train_{}".format(FLAGS.save),sess.graph)
+val_writer = tf.summary.FileWriter("logs/val_{}".format(FLAGS.save),sess.graph)
+
+
+tf.logging.set_verbosity(tf.logging.INFO)
+sess.run(tf.global_variables_initializer())
+
+# tf.logging.info("Running preprocessing of input features")
+# scale_input = []
+# for i in range(200):
+#     feed_dict = get_batch(data_index["train"],batch_size,style=style)
+#     feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
+#     scale_input.append(sess.run(features,feed_dict))
+#     if i%10 == 0: print(str(i))
+# scale_input = np.concatenate(scale_input,axis=0)
+# scale_means = scale_input.sum(axis=2).mean() # just average over everything for now
+# scale_stds = scale_input.sum(axis=2).std()
+# scale_max = scale_input.sum(axis=2).max()
+# print("Mean")
+# print(scale_means)
+# print("Std")
+# print(scale_stds)
+# print("Max")
+# print(scale_max)
+
+
+saver = tf.train.Saver()
+
+if FLAGS.train:
+    last_val_loss = 9999999
+    should_stop = False
+    for i in range(steps):
+        if FLAGS.val:
+            if i > 0 and i % 500 == 0:
+                learning_rate = 0.9*learning_rate
+        else:
+            cum_no_val_step = 0
+            for no_val_i,no_val_step in enumerate(no_val_steps):
+                cum_no_val_step += no_val_step
+                if cum_no_val_step > i:
+                    learning_rate = no_val_lr[no_val_i]
+                    break
+
+        feed_dict = get_batch(data_index["train"],batch_size,style=style)
+        feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph: True})
+        # now here's where we run the real, convnet part
+        if i % 10 == 0:
+            _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],feed_dict)
+            train_writer.add_summary(sum_val,i)
+            tf.logging.info("Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
+
+            # full_feed_dict = get_batch(full_data_index["train"],batch_size,style="full")
+            # full_feed_dict.update({keep_prob: train_keep_prob,learning_rate_ph:learning_rate,is_training_ph:True,use_full_layer:True})
+            # _, sum_val,acc_val,loss_val, _ = sess.run([update_ops,merged_summaries,accuracy_tensor,loss_mean,train_step],full_feed_dict)
+            # tf.logging.info("Full Step {} LR {} Accuracy {} Cross Entropy {}".format(i,learning_rate,acc_val,loss_val))
+        else:
+            sess.run([update_ops,train_step],feed_dict)
+
+        if FLAGS.val:
+            if i % eval_step == 0 or i == (steps - 1):
+                val_loss, val_acc = run_validation("val",i)
+                if val_loss > last_val_loss:
+                    learning_rate = 0.5*learning_rate
+                    print("CHANGING LEARNING RATE TO: {}".format(learning_rate))
+                    # print("Restoring former model and rerunning validation")
+                    # saver.restore(sess,"models/{}.ckpt".format(FLAGS.save))
+                    # val_acc = run_validation("val",i)
+                # else:
+                #     saver.save(sess,"./model.ckpt")
+
+                last_val_loss = val_loss
+
+        if learning_rate < 0.00001: # at this point, just stop
+            break
+    saver.save(sess,"models/{}.ckpt".format(FLAGS.save))
+    if FLAGS.val:
+        test_loss, test_acc = run_validation("test",i)
+        MAVs, MR_MODELS = run_validation("train",i)
+    del data_index # need to conserve RAM
+
+if not FLAGS.train:
+    saver.restore(sess,"models/{}.ckpt".format(FLAGS.save))
+
+test_index = wl.load_test_data(sess)
+# now here's where we run the test classification
+import pandas as pd
+df = pd.DataFrame([],columns=["fname","label"])
+offset = 0
+test_batch_size = batch_size
+test_info = []
+while offset < len(test_index):
+    if offset % 1000 == 0: print(str(offset))
+    # print(offset)
+    feed_dict = get_batch(test_index,test_batch_size,offset=offset,mode="comp",style=style)
+    feed_dict.update({ keep_prob:1.0,is_training_ph:False})
+    test_logits,test_av, test_prob, test_pred = sess.run([final_layer,open_max_layer,probabilities,predictions],feed_dict=feed_dict)
+
+    # use this to average over the regular speed and slowed down predictions
+    # feed_dict.update({keep_prob:1.0,is_training_ph:False,slow_down:True})
+    # test_prob_slow = sess.run(probabilities,feed_dict)
+    # test_pred = (test_prob + test_prob_slow).argmax(axis=1)
+
+    test_files = [t["identifier"] for t in test_index[offset:max(offset + test_batch_size,len(test_index))] ]
+    # use this to ladder up on the silence and unknown labels
+    for i in range(len(list(test_pred))):
+        test_info.append({
+            "guess":wanted_words[test_pred[i]],
+            "fname":test_files[i],
+            "prob":test_prob[i].max(),
+            "all_prob":test_prob[i],
+            "logits":test_logits[i]
         })
-    batch_size = min(FLAGS.batch_size, set_size - i)
-    total_accuracy += (test_accuracy * batch_size) / set_size
-    if total_conf_matrix is None:
-      total_conf_matrix = conf_matrix
-    else:
-      total_conf_matrix += conf_matrix
-  tf.logging.info('Confusion Matrix:\n %s' % (total_conf_matrix))
-  tf.logging.info('Final test accuracy = %.1f%% (N=%d)' % (total_accuracy * 100,
-                                                           set_size))
 
 
-if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  parser.add_argument(
-      '--data_url',
-      type=str,
-      # pylint: disable=line-too-long
-    default=None,
-      # pylint: enable=line-too-long
-      help='Location of speech training data archive on the web.')
-  parser.add_argument(
-      '--data_dir',
-      type=str,
-      default='train/audio',
-      help="""\
-      Where to download the speech training data to.
-      """)
-  parser.add_argument(
-      '--background_volume',
-      type=float,
-      default=0.1,
-      help="""\
-      How loud the background noise should be, between 0 and 1.
-      """)
-  parser.add_argument(
-      '--background_frequency',
-      type=float,
-      default=0.8,
-      help="""\
-      How many of the training samples have background noise mixed in.
-      """)
-  parser.add_argument(
-      '--silence_percentage',
-      type=float,
-      default=10.0,
-      help="""\
-      How much of the training data should be silence.
-      """)
-  parser.add_argument(
-      '--unknown_percentage',
-      type=float,
-      default=10.0,
-      help="""\
-      How much of the training data should be unknown words.
-      """)
-  parser.add_argument(
-      '--time_shift_ms',
-      type=float,
-      default=100.0,
-      help="""\
-      Range to randomly shift the training audio by in time.
-      """)
-  parser.add_argument(
-      '--testing_percentage',
-      type=int,
-      default=10,
-      help='What percentage of wavs to use as a test set.')
-  parser.add_argument(
-      '--validation_percentage',
-      type=int,
-      default=10,
-      help='What percentage of wavs to use as a validation set.')
-  parser.add_argument(
-      '--sample_rate',
-      type=int,
-      default=16000,
-      help='Expected sample rate of the wavs',)
-  parser.add_argument(
-      '--clip_duration_ms',
-      type=int,
-      default=1000,
-      help='Expected duration in milliseconds of the wavs',)
-  parser.add_argument(
-      '--window_size_ms',
-      type=float,
-      default=30.0,
-      help='How long each spectrogram timeslice is',)
-  parser.add_argument(
-      '--window_stride_ms',
-      type=float,
-      default=10.0,
-      help='How long each spectrogram timeslice is',)
-  parser.add_argument(
-      '--dct_coefficient_count',
-      type=int,
-      default=40,
-      help='How many bins to use for the MFCC fingerprint',)
-  parser.add_argument(
-      '--how_many_training_steps',
-      type=str,
-      default='15000,3000',
-      help='How many training loops to run',)
-  parser.add_argument(
-      '--eval_step_interval',
-      type=int,
-      default=400,
-      help='How often to evaluate the training results.')
-  parser.add_argument(
-      '--learning_rate',
-      type=str,
-      default='0.001,0.0001',
-      help='How large a learning rate to use when training.')
-  parser.add_argument(
-      '--batch_size',
-      type=int,
-      default=100,
-      help='How many items to train with at once',)
-  parser.add_argument(
-      '--summaries_dir',
-      type=str,
-      default='/tmp/retrain_logs',
-      help='Where to save summary logs for TensorBoard.')
-  parser.add_argument(
-      '--wanted_words',
-      type=str,
-      default='yes,no,up,down,left,right,on,off,stop,go',
-      help='Words to use (others will be added to an unknown label)',)
-  parser.add_argument(
-      '--train_dir',
-      type=str,
-      default='logs/train',
-      help='Directory to write event logs and checkpoint.')
-  parser.add_argument(
-      '--save_step_interval',
-      type=int,
-      default=100,
-      help='Save model checkpoint every save_steps.')
-  parser.add_argument(
-      '--start_checkpoint',
-      type=str,
-      default='',
-      help='If specified, restore this pretrained model before any training.')
-  parser.add_argument(
-      '--model_architecture',
-      type=str,
-      default='conv',
-      help='What model architecture to use')
-  parser.add_argument(
-      '--check_nans',
-      type=bool,
-      default=False,
-      help='Whether to check for invalid numbers during processing')
+    test_labels = [all_words[test_index] for test_index in test_pred]
+    for i in range(len(test_labels)):
+        if test_labels[i] not in wanted_words:
+            test_labels[i] = "unknown"
+    test_batch_df = pd.DataFrame([{"fname":ti,"label":tl} for ti,tl in zip(test_files,test_labels)])
+    offset += test_batch_size
+    df = pd.concat([df,test_batch_df])
 
-  FLAGS, unparsed = parser.parse_known_args()
-  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+df.to_csv("models/{}_guesses.csv".format(FLAGS.save),index=False)
+sess.close()
+with open("models/{}_comp.pickle".format(FLAGS.save),"wb") as f:
+    pickle.dump(test_info,f)
+
+from twilio.rest import Client
+
+# Your Account SID from twilio.com/console
+account_sid = "AC7ef9b2470e5800d2cf47640564e18f3f"
+# Your Auth Token from twilio.com/console
+auth_token  = "e36bb44f5528a0bcbe45509b113d9469"
+
+if FLAGS.val:
+    client = Client(account_sid, auth_token)
+    message = client.messages.create(
+        to="+19082682005",
+        from_="+12673607895",
+        body="Model finished running with {} val accuracy and {} val loss".format(val_acc,val_loss)) 
+else:
+    client = Client(account_sid, auth_token)
+    message = client.messages.create(
+        to="+19082682005",
+        from_="+12673607895",
+        body="Model finished running")
+
+
+print(message.sid)
+
