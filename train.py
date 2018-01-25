@@ -46,7 +46,6 @@ all_words = wanted_words +["one","bed","bird","cat","dog","eight","five","four",
 all_words_index = {w:i for i,w in enumerate(all_words)}
 
 import pickle
-import libmr
 import scipy.spatial.distance as spd
 import pandas as pd
 import re
