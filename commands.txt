@@ -2,20 +2,21 @@ python tom_train_1.py --features log-mel --model overdrive --save overdrive --tr
 python tom_train_1.py --features log-mel --model overdrive --save overdrive_pl1 --pseudo_labels overdrive --train --no-val
 python tom_train_1.py --features log-mel --model overdrive --save overdrive_pl2 --pseudo_labels overdrive_pl1 --train --no-val
 python tom_train_1.py --features equal-log-mel --model overdrive --save overdrive_frame_eq --train --no-val --pseudo_labels overdrive
-python tom_train_1.py --features log-mel --model overdrive --save overdrive_no_noise --train --no-val --no-noise
 python tom_train_1.py --features log-mel-40 --model okconv --save okconv --train --no-val
 python tom_train_1.py --features mfcc-13 --model mfccnet --save mfccnet --train --no-val
-python tom_train_1.py --features log-mel --model overdrive --save overdrive_10 --seed 10 --train --no-val
-python tom_train_semi.py --features log-mel --model overdrive --restore overdrive --save overdrive_semi --train --no-val --pseudo_labels overdrive --pseudo-tom
 python tom_train_1.py --features mfcc-13 --model mfccnet --save mfccnet_pl1 --train --no-val --pseudo_labels mfccnet
-python tom_train_1.py --features log-mel --model overdrive --save overdrive_10_pl1 --seed 10 --train --no-val --pseudo_labels overdrive_10
-python tom_train_1.py --features mfcc-13 --model mfccnet --save mfccnet_pl2 --train --no-val --pseudo_labels mfccnet_pl1
-python tom_train_1.py --features log-mel --model ap_overdrive --save ap_overdrive --train --no-val
-python tom_train_1.py --features log-mel --model small_overdrive --save small_overdrive --train --no-val
-python tom_train_1.py --features log-mel --model smaller_overdrive --save smaller_overdrive --train --no-val
-python tom_train_1.py --features log-mel --model squeeze_overdrive --save squeeze_overdrive --train --no-val
 python tom_train_1.py --features short-log-mel --model overdrive --save overdrive_short --train --no-val
-python tom_train_1.py --features log-mel --model overdrive --save overdrive_10_pl2 --pseudo_labels overdrive_10_pl1 --train --no-val --seed 10
 python tom_train_1.py --features short-log-mel --model overdrive --save overdrive_short_pl1 --pseudo_labels overdrive_short --train --no-val
 python tom_train_1.py --features short-log-mel --model overdrive --save overdrive_short_pl2 --pseudo_labels overdrive_short_pl1 --train --no-val
+
+cp models/overdrive_comp.pickle ensemble_models/
+cp models/overdrive_pl1_comp.pickle ensemble_models/
+cp models/overdrive_pl2_comp.pickle ensemble_models/
+cp models/overdrive_frame_eq_comp.pickle ensemble_models/
+cp models/okconv_comp.pickle ensemble_models/
+cp models/overdrive_short_comp.pickle ensemble_models/
+cp models/overdrive_short_pl1_comp.pickle ensemble_models/
+cp models/overdrive_short_pl2_comp.pickle ensemble_models/
+
+python ensemble_sqrt.py
 
